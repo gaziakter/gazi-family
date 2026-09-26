@@ -9,7 +9,7 @@ import {
   sameOrigin,
   tokenHash,
 } from "@/lib/auth";
-import { permissions } from "@/lib/types";
+import { permissions, memberPermissions, viewerPermissions } from "@/lib/types";
 import { z } from "zod";
 const attempts = new Map<string, { count: number; until: number }>();
 export async function GET() {
@@ -85,9 +85,9 @@ export async function POST(req: Request) {
           data: [
             {
               name: "Member",
-              permissions: ["transactions.write", "reports.read"],
+              permissions: memberPermissions,
             },
-            { name: "Viewer", permissions: ["reports.read"] },
+            { name: "Viewer", permissions: viewerPermissions },
           ],
         });
         await tx.category.createMany({

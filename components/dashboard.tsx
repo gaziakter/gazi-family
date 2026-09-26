@@ -1,4 +1,6 @@
 "use client";
+import PermissionMatrix from "./permission-matrix";
+import PasswordInput from "./password-input";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowDownLeft,
@@ -38,10 +40,12 @@ import {
   Utensils,
   type LucideIcon,
 } from "lucide-react";
+import ReportTable from "./report-table";
+import { reportTable, inReportPeriod, type ReportMode } from "@/lib/reports";
 import PasswordDialog from "./password-dialog";
 import { categoryColor } from "@/lib/theme";
 import { demoData } from "@/lib/demo";
-import { Data, Collection, permissions, totals, csvCell } from "@/lib/types";
+import { Data, Collection, permissions, totals } from "@/lib/types";
 type Page =
   | "overview"
   | "income"
@@ -73,14 +77,6 @@ const nav: { id: Page; label: string; bn: string; icon: LucideIcon }[] = [
     icon: ShieldCheck,
   },
 ];
-const access: Record<Collection, string> = {
-  transactions: "transactions.write",
-  categories: "categories.write",
-  budgets: "budgets.write",
-  goals: "goals.write",
-  users: "users.manage",
-  roles: "roles.manage",
-};
 const collectionFor: Partial<Record<Page, Collection>> = {
   income: "transactions",
   expenses: "transactions",
@@ -116,6 +112,8 @@ function IconFor({ name }: { name: string }) {
 }
 export default function Dashboard({ demo }: { demo: boolean }) {
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [reportMode, setReportMode] = useState<ReportMode>("transactions-date");
   const [data, setData] = useState<Data | null>(null),
     [page, setPage] = useState<Page>("overview"),
     [month, setMonth] = useState(today().slice(0, 7)),
@@ -155,7 +153,43 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     if (demo) {
       try {
         const saved = localStorage.getItem("gazi-family-demo-v1");
-        setData(saved ? JSON.parse(saved) : demoData());
+        const restored: Data = saved ? JSON.parse(saved) : demoData();
+        if (
+          restored.roles.some((r) =>
+            r.permissions.some(
+              (p) => p.endsWith(".write") || p.endsWith(".manage"),
+            ),
+          )
+        ) {
+          restored.roles = restored.roles.map((r) => ({
+            ...r,
+            permissions:
+              r.name === "Owner"
+                ? [...permissions]
+                : [
+                    ...new Set([
+                      ...[
+                        "transactions",
+                        "categories",
+                        "budgets",
+                        "goals",
+                        "users",
+                        "roles",
+                      ].map((m) => m + ".read"),
+                      ...r.permissions.flatMap((p) =>
+                        p.endsWith(".write") || p.endsWith(".manage")
+                          ? ["create", "update", "delete"].map(
+                              (a) => p.split(".")[0] + "." + a,
+                            )
+                          : p === "reports.read"
+                            ? [p, "reports.export"]
+                            : [p],
+                      ),
+                    ]),
+                  ],
+          }));
+        }
+        setData(restored);
       } catch {
         setData(demoData());
       }
@@ -202,17 +236,31 @@ export default function Dashboard({ demo }: { demo: boolean }) {
   }, []);
   const me = data?.users.find((u) => u.id === data.currentUserId),
     myRole = data?.roles.find((r) => r.id === me?.roleId);
-  const can = (c: Collection) => !!myRole?.permissions.includes(access[c]);
+  const can = (c: Collection, action = "create") =>
+    !!myRole?.permissions.includes(`${c}.${action}`);
+  const canEnter = (p: Page) =>
+    p === "overview" ||
+    (p === "reports"
+      ? !!myRole?.permissions.includes("reports.read")
+      : !!collectionFor[p] &&
+        ["read", "create", "update", "delete"].some((a) =>
+          can(collectionFor[p]!, a),
+        ));
   const entries = useMemo(
-    () => data?.transactions.filter((e) => e.date.startsWith(month)) ?? [],
-    [data, month],
+    () =>
+      can("transactions", "read")
+        ? (data?.transactions.filter((e) => e.date.startsWith(month)) ?? [])
+        : [],
+    [data, month, myRole],
   );
   const summary = totals(entries),
-    allSummary = totals(data?.transactions ?? []);
+    allSummary = totals(
+      can("transactions", "read") ? (data?.transactions ?? []) : [],
+    );
   const reportEntries =
-    page === "reports" && reportPeriod !== "month"
-      ? (data?.transactions ?? []).filter(
-          (e) => reportPeriod === "all" || e.date.startsWith(month.slice(0, 4)),
+    page === "reports"
+      ? (data?.transactions ?? []).filter((e) =>
+          inReportPeriod(e.date, reportPeriod, month, from, to),
         )
       : entries;
   const filtered = reportEntries
@@ -230,15 +278,36 @@ export default function Dashboard({ demo }: { demo: boolean }) {
           .includes(search.toLowerCase()),
     )
     .sort((a, b) => b.date.localeCompare(a.date));
+  const reportRows = filtered.map((e) => ({
+    ...e,
+    category: data?.categories.find((c) => c.id === e.categoryId)?.name ?? "",
+    member: data?.users.find((u) => u.id === e.userId)?.name ?? "",
+  }));
+  const reportModel = reportTable(reportRows, reportMode);
+  const invalidRange = !!(from && to && from > to);
   function navigate(p: Page) {
     setMemberFilter("all");
-    setReportPeriod("month");
+    setReportPeriod(
+      p === "reports" && reportMode !== "statement-month" ? "date" : "month",
+    );
     setPage(p);
     setSearch("");
     setAccount("all");
     setCategoryFilter("all");
-    setFrom("");
-    setTo("");
+    setFrom(
+      p === "reports" && reportMode !== "statement-month" ? month + "-01" : "",
+    );
+    setTo(
+      p === "reports" && reportMode !== "statement-month"
+        ? month +
+            "-" +
+            new Date(
+              Number(month.slice(0, 4)),
+              Number(month.slice(5, 7)),
+              0,
+            ).getDate()
+        : "",
+    );
     setMobile(false);
   }
   async function mutate(
@@ -247,7 +316,13 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     values?: Record<string, unknown>,
     id?: string,
   ) {
-    if (!data || !can(collection))
+    if (
+      !data ||
+      !can(
+        collection,
+        action === "delete" ? "delete" : id ? "update" : "create",
+      )
+    )
       throw Error("Your role does not allow this action.");
     if (demo) {
       const next = structuredClone(data);
@@ -350,41 +425,73 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         : t("Saved successfully", "সফলভাবে সংরক্ষিত হয়েছে"),
     );
   }
-  function exportCSV() {
-    if (!myRole?.permissions.includes("reports.read")) return;
-    const rows = [
-      [
-        "Date",
-        "Description",
-        "Type",
-        "Category",
-        "Account",
-        "Member",
-        "Amount (BDT)",
-        "Note",
-      ],
-      ...filtered.map((e) => [
-        e.date,
-        e.title,
-        e.type,
-        data?.categories.find((c) => c.id === e.categoryId)?.name,
-        e.account,
-        data?.users.find((u) => u.id === e.userId)?.name,
-        e.amount,
-        e.note,
-      ]),
-    ];
-    const blob = new Blob(
-      ["\uFEFF" + rows.map((r) => r.map(csvCell).join(",")).join("\r\n")],
-      { type: "text/csv;charset=utf-8;" },
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `gazi-family-${reportPeriod === "all" ? "all-time" : reportPeriod === "year" ? month.slice(0, 4) : month}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setToast("Report exported");
+  async function exportPDF() {
+    if (
+      !myRole?.permissions.includes("reports.read") ||
+      !myRole?.permissions.includes("reports.export") ||
+      exporting
+    )
+      return;
+    setExporting(true);
+    try {
+      const response = await fetch("/api/reports/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          demo,
+          month,
+          period: reportPeriod,
+          mode: reportMode,
+          account,
+          categoryId: categoryFilter,
+          memberId: memberFilter,
+          search,
+          from,
+          to,
+          ...(demo
+            ? {
+                demoRows: filtered.map((e) => ({
+                  ...e,
+                  category:
+                    data?.categories.find((c) => c.id === e.categoryId)?.name ??
+                    "",
+                  member:
+                    data?.users.find((u) => u.id === e.userId)?.name ?? "",
+                })),
+              }
+            : {}),
+        }),
+      });
+      if (!response.ok) {
+        const body = await response.json();
+        throw Error(body.error ?? "PDF export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const period =
+        reportPeriod === "all"
+          ? "all-time"
+          : reportPeriod === "year"
+            ? month.slice(0, 4)
+            : month;
+      link.download =
+        "gazi-family-" +
+        reportMode +
+        "-" +
+        (reportPeriod === "date" ? "date-range" : period) +
+        ".pdf";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setToast(t("PDF report downloaded", "PDF রিপোর্ট ডাউনলোড হয়েছে"));
+    } catch (error) {
+      setToast((error as Error).message);
+    } finally {
+      setExporting(false);
+    }
   }
   async function signIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -467,9 +574,8 @@ export default function Dashboard({ demo }: { demo: boolean }) {
           </label>
           <label>
             Password
-            <input
+            <PasswordInput
               name="password"
-              type="password"
               minLength={10}
               maxLength={128}
               required
@@ -515,7 +621,11 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     return {
       label: d.toLocaleDateString("en-US", { month: "short" }),
-      ...totals(data.transactions.filter((e) => e.date.startsWith(key))),
+      ...totals(
+        can("transactions", "read")
+          ? data.transactions.filter((e) => e.date.startsWith(key))
+          : [],
+      ),
     };
   });
   const chartMax =
@@ -526,26 +636,30 @@ export default function Dashboard({ demo }: { demo: boolean }) {
       type: page === "income" ? "income" : "expense",
     });
   const actions = (collection: Collection, item: object) =>
-    can(collection) ? (
+    can(collection, "update") || can(collection, "delete") ? (
       <div className="row-actions">
-        <button
-          title="Edit"
-          aria-label="Edit record"
-          onClick={() =>
-            setModal({ collection, item: item as Record<string, unknown> })
-          }
-        >
-          <Pencil size={14} />
-        </button>
-        <button
-          title="Delete"
-          aria-label="Delete record"
-          onClick={() =>
-            setDeleteItem({ collection, id: (item as { id: string }).id })
-          }
-        >
-          <Trash2 size={14} />
-        </button>
+        {can(collection, "update") && (
+          <button
+            title="Edit"
+            aria-label="Edit record"
+            onClick={() =>
+              setModal({ collection, item: item as Record<string, unknown> })
+            }
+          >
+            <Pencil size={14} />
+          </button>
+        )}
+        {can(collection, "delete") && (
+          <button
+            title="Delete"
+            aria-label="Delete record"
+            onClick={() =>
+              setDeleteItem({ collection, id: (item as { id: string }).id })
+            }
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     ) : null;
   const transactionsTable = (limit?: number) => (
@@ -707,26 +821,11 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             Gazi Family<span className="brand-dot">.</span>
           </span>
         </a>
-        <div className="family-space">
-          <span className="family-avatar">GF</span>
-          <div>
-            <strong>{t("Our family space", "আমাদের পরিবার")}</strong>
-            <small>
-              <span className="status-dot" />{" "}
-              {t("Personal account", "ব্যক্তিগত অ্যাকাউন্ট")}
-            </small>
-          </div>
-          <ChevronDown size={14} />
-        </div>
         <span className="nav-label">{t("WORKSPACE", "ওয়ার্কস্পেস")}</span>
         <nav>
           {nav
             .slice(0, 7)
-            .filter(
-              (n) =>
-                n.id !== "reports" ||
-                myRole?.permissions.includes("reports.read"),
-            )
+            .filter((n) => canEnter(n.id))
             .map((n) => (
               <button
                 key={n.id}
@@ -743,16 +842,19 @@ export default function Dashboard({ demo }: { demo: boolean }) {
           {t("FAMILY MANAGEMENT", "পরিবার ব্যবস্থাপনা")}
         </span>
         <nav>
-          {nav.slice(7).map((n) => (
-            <button
-              key={n.id}
-              className={"nav-item " + (page === n.id ? "active" : "")}
-              onClick={() => navigate(n.id)}
-            >
-              <n.icon size={19} />
-              <span>{language ? n.bn : n.label}</span>
-            </button>
-          ))}
+          {nav
+            .slice(7)
+            .filter((n) => canEnter(n.id))
+            .map((n) => (
+              <button
+                key={n.id}
+                className={"nav-item " + (page === n.id ? "active" : "")}
+                onClick={() => navigate(n.id)}
+              >
+                <n.icon size={19} />
+                <span>{language ? n.bn : n.label}</span>
+              </button>
+            ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="together-card">
@@ -895,19 +997,21 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               </p>
             </div>
             <div className="heading-actions">
-              <label className="month-picker">
-                <CalendarDays size={16} />
-                <span>{monthName}</span>
-                <input
-                  aria-label="Select month"
-                  type="month"
-                  value={month}
-                  onChange={(e) => {
-                    if (e.target.value) setMonth(e.target.value);
-                  }}
-                />
-                <ChevronDown size={14} />
-              </label>
+              {page !== "reports" && (
+                <label className="month-picker">
+                  <CalendarDays size={16} />
+                  <span>{monthName}</span>
+                  <input
+                    aria-label="Select month"
+                    type="month"
+                    value={month}
+                    onChange={(e) => {
+                      if (e.target.value) setMonth(e.target.value);
+                    }}
+                  />
+                  <ChevronDown size={14} />
+                </label>
+              )}
               {(page === "overview"
                 ? can("transactions")
                 : collectionFor[page] && can(collectionFor[page]!)) && (
@@ -922,9 +1026,21 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               )}
               {page === "reports" &&
                 myRole?.permissions.includes("reports.read") && (
-                  <button className="btn primary" onClick={exportCSV}>
-                    <Download size={16} />
-                    Export CSV
+                  <button
+                    className="btn primary"
+                    onClick={exportPDF}
+                    disabled={
+                      exporting ||
+                      invalidRange ||
+                      !myRole?.permissions.includes("reports.export")
+                    }
+                  >
+                    {exporting ? (
+                      <LoaderCircle size={16} className="spin" />
+                    ) : (
+                      <Download size={16} />
+                    )}
+                    {exporting ? "Creating PDF..." : "Export PDF"}
                   </button>
                 )}
             </div>
@@ -1276,20 +1392,143 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                 </div>
               ) : (
                 <>
+                  {page === "reports" && (
+                    <div className="report-controls">
+                      <label>
+                        Report type
+                        <select
+                          aria-label="Report type"
+                          value={reportMode}
+                          onChange={(e) => {
+                            const mode = e.target.value as ReportMode;
+                            setReportMode(mode);
+                            if (mode === "statement-month") {
+                              setReportPeriod("month");
+                              setFrom("");
+                              setTo("");
+                            } else {
+                              setReportPeriod("date");
+                              setFrom(from || month + "-01");
+                              setTo(
+                                to ||
+                                  month +
+                                    "-" +
+                                    new Date(
+                                      Number(month.slice(0, 4)),
+                                      Number(month.slice(5, 7)),
+                                      0,
+                                    ).getDate(),
+                              );
+                            }
+                          }}
+                        >
+                          <option value="transactions-date">
+                            Transaction report - Date-wise
+                          </option>
+                          <option value="transactions-head">
+                            Transaction report - Head-wise
+                          </option>
+                          <option value="statement-date">
+                            Income & Expense Statement - Date-wise
+                          </option>
+                          <option value="statement-month">
+                            Income & Expense Statement - Month-wise
+                          </option>
+                        </select>
+                      </label>
+                      {reportMode === "statement-month" ? (
+                        <label>
+                          Month
+                          <input
+                            aria-label="Report month"
+                            type="month"
+                            value={month}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setMonth(e.target.value);
+                                setReportPeriod("month");
+                                setFrom("");
+                                setTo("");
+                              }
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <>
+                          <label className="date-filter">
+                            From
+                            <input
+                              type="date"
+                              value={from}
+                              onChange={(e) => {
+                                setFrom(e.target.value);
+                                setReportPeriod("date");
+                              }}
+                            />
+                          </label>
+                          <label className="date-filter">
+                            To
+                            <input
+                              type="date"
+                              value={to}
+                              onChange={(e) => {
+                                setTo(e.target.value);
+                                setReportPeriod("date");
+                              }}
+                            />
+                          </label>
+                        </>
+                      )}
+                      <span>
+                        Heads are your income and expense categories. Every
+                        report can be exported as PDF.
+                      </span>
+                    </div>
+                  )}
                   <div className="report-summary">
                     <div className="card">
-                      <span>Income</span>
+                      <span>
+                        {page === "reports" && reportModel.statement
+                          ? "Total income"
+                          : "Income"}
+                      </span>
                       <h2 className="positive">
-                        {money(totals(filtered).income)}
+                        {money(
+                          page === "reports" && reportModel.statement
+                            ? reportModel.income
+                            : totals(filtered).income,
+                        )}
                       </h2>
                     </div>
                     <div className="card">
-                      <span>Expenses</span>
-                      <h2>{money(totals(filtered).expense)}</h2>
+                      <span>
+                        {page === "reports" && reportModel.statement
+                          ? "Total expense"
+                          : "Expenses"}
+                      </span>
+                      <h2>
+                        {money(
+                          page === "reports" && reportModel.statement
+                            ? reportModel.expense
+                            : totals(filtered).expense,
+                        )}
+                      </h2>
                     </div>
                     <div className="card">
-                      <span>Net balance</span>
-                      <h2>{money(totals(filtered).balance)}</h2>
+                      <span>
+                        {page === "reports" && reportModel.statement
+                          ? reportModel.balance < 0
+                            ? "Deficit"
+                            : "Surplus"
+                          : "Net balance"}
+                      </span>
+                      <h2>
+                        {money(
+                          page === "reports" && reportModel.statement
+                            ? Math.abs(reportModel.balance)
+                            : totals(filtered).balance,
+                        )}
+                      </h2>
                     </div>
                   </div>
                   <div className="card">
@@ -1320,7 +1559,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
                       >
-                        <option value="all">All categories</option>
+                        <option value="all">All heads / categories</option>
                         {data.categories.map((c) => (
                           <option value={c.id} key={c.id}>
                             {c.name}
@@ -1329,15 +1568,6 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                       </select>
                       {page === "reports" && (
                         <>
-                          <select
-                            aria-label="Report period"
-                            value={reportPeriod}
-                            onChange={(e) => setReportPeriod(e.target.value)}
-                          >
-                            <option value="month">Selected month</option>
-                            <option value="year">Selected year</option>
-                            <option value="all">All time</option>
-                          </select>
                           <select
                             aria-label="Filter family member"
                             value={memberFilter}
@@ -1352,38 +1582,34 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                           </select>
                         </>
                       )}
-                      {page === "reports" && (
-                        <>
-                          <label className="date-filter">
-                            From
-                            <input
-                              type="date"
-                              value={from}
-                              onChange={(e) => setFrom(e.target.value)}
-                            />
-                          </label>
-                          <label className="date-filter">
-                            To
-                            <input
-                              type="date"
-                              value={to}
-                              onChange={(e) => setTo(e.target.value)}
-                            />
-                          </label>
-                        </>
-                      )}
                     </div>
-                    {transactionsTable()}
+                    {page === "reports" ? (
+                      <>
+                        {invalidRange && (
+                          <div className="error" role="alert">
+                            From date must be on or before To date.
+                          </div>
+                        )}
+                        <ReportTable rows={reportRows} mode={reportMode} />
+                      </>
+                    ) : (
+                      transactionsTable()
+                    )}
                     <div className="table-footer">
                       {filtered.length} transactions ·{" "}
-                      {page === "reports" && reportPeriod === "all"
-                        ? "All time"
-                        : page === "reports" && reportPeriod === "year"
-                          ? month.slice(0, 4)
-                          : monthName}
+                      {page === "reports" && reportPeriod === "date"
+                        ? `${from || "Beginning"} to ${to || "Latest"}`
+                        : page === "reports" && reportPeriod === "all"
+                          ? "All time"
+                          : page === "reports" && reportPeriod === "year"
+                            ? month.slice(0, 4)
+                            : monthName}
                       {page === "reports" && (
                         <button
                           className="text-button"
+                          disabled={
+                            !myRole?.permissions.includes("reports.export")
+                          }
                           onClick={() => window.print()}
                         >
                           Print report <ArrowUpRight size={14} />
@@ -1418,7 +1644,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               )}
             </>
           )}
-          {page === "budgets" && (
+          {page === "budgets" && canEnter("budgets") && (
             <>
               <div className="info-strip">
                 <Wallet size={19} />
@@ -1430,7 +1656,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               {budgetList(true)}
             </>
           )}
-          {page === "goals" && (
+          {page === "goals" && canEnter("goals") && (
             <>
               <div className="info-strip">
                 <Leaf size={19} />
@@ -1479,7 +1705,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               </div>
             </>
           )}
-          {page === "categories" && (
+          {page === "categories" && canEnter("categories") && (
             <div className="category-grid">
               {["income", "expense"].map((type) => (
                 <div className="card" key={type}>
@@ -1522,7 +1748,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               ))}
             </div>
           )}
-          {page === "members" && (
+          {page === "members" && canEnter("members") && (
             <div className="card">
               <div className="card-heading">
                 <div>
@@ -1582,12 +1808,13 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               </div>
             </div>
           )}
-          {page === "roles" && (
+          {page === "roles" && canEnter("roles") && (
             <>
               <div className="info-strip">
                 <ShieldCheck size={19} />
-                All members can view the family ledger. Permissions control
-                changes and report access. The Owner role is protected.
+                Choose View, Create, Update and Delete separately for each
+                module. Reports have separate View and Export PDF permissions.
+                The Owner role is protected.
               </div>
               <div className="role-grid">
                 {data.roles.map((r) => (
@@ -1603,27 +1830,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                       {data.users.filter((u) => u.roleId === r.id).length}{" "}
                       members
                     </p>
-                    <div className="permission-list">
-                      {permissions.map((p) => (
-                        <div
-                          key={p}
-                          className={
-                            !r.permissions.includes(p)
-                              ? "disabled-permission"
-                              : ""
-                          }
-                        >
-                          {r.permissions.includes(p) ? (
-                            <Check size={15} />
-                          ) : (
-                            <X size={15} />
-                          )}
-                          <span>
-                            {p.replace(".", " · ").replace("write", "manage")}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <PermissionMatrix selected={r.permissions} />
                   </div>
                 ))}
               </div>
@@ -2062,9 +2269,8 @@ function RecordModal({
               </label>
               <label>
                 {item ? "New password (leave blank to keep)" : "Password"}
-                <input
+                <PasswordInput
                   name="password"
-                  type="password"
                   required={!item}
                   minLength={10}
                   maxLength={128}
@@ -2104,21 +2310,18 @@ function RecordModal({
                   defaultValue={val("name")}
                 />
               </label>
-              <div className="permission-checkboxes">
-                {permissions.map((p) => (
-                  <label key={p}>
-                    <input
-                      type="checkbox"
-                      name="permissions"
-                      value={p}
-                      defaultChecked={(
-                        item?.permissions as string[] | undefined
-                      )?.includes(p)}
-                    />
-                    {p.replace(".", " · ").replace("write", "manage")}
-                  </label>
-                ))}
-              </div>
+              <PermissionMatrix
+                editable
+                selected={(item?.permissions as string[] | undefined) ?? []}
+                allowed={
+                  data.roles.find(
+                    (r) =>
+                      r.id ===
+                      data.users.find((u) => u.id === data.currentUserId)
+                        ?.roleId,
+                  )?.permissions ?? []
+                }
+              />
             </>
           )}
         </div>

@@ -1,4 +1,9 @@
-import { Data, permissions } from "./types";
+import {
+  Data,
+  permissions,
+  memberPermissions,
+  viewerPermissions,
+} from "./types";
 export function demoData(): Data {
   const month = new Date()
     .toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" })
@@ -10,9 +15,9 @@ export function demoData(): Data {
       {
         id: "r2",
         name: "Member",
-        permissions: ["transactions.write", "reports.read"],
+        permissions: memberPermissions,
       },
-      { id: "r3", name: "Viewer", permissions: ["reports.read"] },
+      { id: "r3", name: "Viewer", permissions: viewerPermissions },
     ],
     users: [
       { id: "u1", name: "Gazi Akter", email: "gazi@example.com", roleId: "r1" },

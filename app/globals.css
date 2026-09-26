@@ -19,7 +19,7 @@ body {
   color: var(--text);
   background: var(--bg);
   font-family: "DM Sans", Arial, sans-serif;
-  font-size: 13px;
+  font-size: 14.95px;
   -webkit-font-smoothing: antialiased;
 }
 button,
@@ -122,7 +122,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: 10px;
   font-family: "Manrope", sans-serif;
-  font-size: 21px;
+  font-size: 24.15px;
   font-weight: 800;
   letter-spacing: -0.8px;
   white-space: nowrap;
@@ -141,54 +141,11 @@ input[type="checkbox"] {
 .brand-dot {
   color: var(--primary);
 }
-.family-space {
-  margin: 33px 0 30px;
-  padding: 12px 9px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #fff8ec;
-}
-.family-avatar {
-  display: grid;
-  place-items: center;
-  height: 32px;
-  width: 32px;
-  background: #eee6db;
-  border: 1px solid #ded5cc;
-  border-radius: 7px;
-  color: #6b6b63;
-  font-size: 11px;
-  font-weight: 700;
-}
-.family-space strong {
-  font-size: 11px;
-  font-weight: 600;
-  display: block;
-}
-.family-space small {
-  font-size: 10px;
-  color: #78786f;
-  display: block;
-  margin-top: 5px;
-}
-.family-space > svg {
-  margin-left: auto;
-  color: #78786f;
-}
-.status-dot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  background: var(--secondary);
-  border-radius: 50%;
-  vertical-align: middle;
-  margin-right: 3px;
+.sidebar > .brand {
+  margin-bottom: 32px;
 }
 .nav-label {
-  font-size: 9px;
+  font-size: 10.35px;
   letter-spacing: 1.45px;
   font-weight: 650;
   color: #74736b;
@@ -203,7 +160,7 @@ input[type="checkbox"] {
   border-radius: 7px;
   text-align: left;
   color: #6b6b63;
-  font-size: 12px;
+  font-size: 13.8px;
   margin-bottom: 5px;
   transition:
     background 0.2s,
@@ -230,7 +187,7 @@ input[type="checkbox"] {
 }
 .manage-label {
   margin-top: 26px;
-  font-size: 8.5px;
+  font-size: 9.775px;
 }
 .sidebar-bottom {
   flex-shrink: 0;
@@ -253,13 +210,13 @@ input[type="checkbox"] {
   margin-bottom: 12px;
 }
 .together-card h4 {
-  font-size: 11px;
+  font-size: 12.65px;
   font-weight: 750;
   letter-spacing: -0.2px;
 }
 .together-card p {
   color: #78786f;
-  font-size: 10px;
+  font-size: 11.5px;
   line-height: 1.8;
   margin-top: 7px;
 }
@@ -268,7 +225,7 @@ input[type="checkbox"] {
   align-items: center;
   gap: 7px;
   color: #a30b08;
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 600;
   padding: 0;
   margin-top: 13px;
@@ -292,18 +249,18 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12.65px;
   box-shadow: 0 0 0 1px #eee6db;
   flex-shrink: 0;
 }
 .profile strong {
-  font-size: 11px;
+  font-size: 12.65px;
   display: block;
 }
 .profile small {
   display: block;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 11.5px;
   color: #78786f;
 }
 .profile button {
@@ -326,7 +283,7 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 13px;
-  font-size: 11px;
+  font-size: 12.65px;
   color: #74736b;
 }
 .breadcrumb strong {
@@ -345,7 +302,7 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12.65px;
   color: #6b6b63;
   padding: 6px;
 }
@@ -362,14 +319,14 @@ input[type="checkbox"] {
   height: 30px;
   background: #ded5cc;
   color: #4c4b45;
-  font-size: 12px;
+  font-size: 13.8px;
   font-weight: 600;
 }
 .demo-badge {
   border: 1px solid #eee6db;
   background: #faf5eb;
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #78786f;
   padding: 5px 8px;
   display: flex;
@@ -395,14 +352,14 @@ input[type="checkbox"] {
   margin-bottom: 29px;
 }
 .eyebrow {
-  font-size: 8px;
+  font-size: 9.2px;
   letter-spacing: 1.7px;
   font-weight: 650;
   color: #78786f;
   margin-bottom: 10px;
 }
 .page-heading h1 {
-  font-size: 25px;
+  font-size: 28.75px;
   font-weight: 700;
   letter-spacing: -1.15px;
   line-height: 1.4;
@@ -412,12 +369,12 @@ input[type="checkbox"] {
 }
 .heading-spark {
   font-family: serif;
-  font-size: 25px;
+  font-size: 28.75px;
   color: var(--primary);
   font-weight: 400;
 }
 .page-heading p {
-  font-size: 11px;
+  font-size: 12.65px;
   color: #78786f;
   margin-top: 7px;
 }
@@ -436,7 +393,7 @@ input[type="checkbox"] {
   background: #fffaf0;
   border-radius: 6px;
   padding: 11px 15px;
-  font-size: 11px;
+  font-size: 12.65px;
   font-weight: 550;
   white-space: nowrap;
   transition:
@@ -465,7 +422,7 @@ input[type="checkbox"] {
   border: 1px solid #eee6db;
   border-radius: 6px;
   padding: 11px 12px;
-  font-size: 10px;
+  font-size: 11.5px;
   white-space: nowrap;
   color: #6b6b63;
 }
@@ -504,7 +461,7 @@ input[type="checkbox"] {
   justify-content: space-between;
   align-items: center;
   color: #78786f;
-  font-size: 11px;
+  font-size: 12.65px;
 }
 .stat-icon {
   height: 31px;
@@ -529,7 +486,7 @@ input[type="checkbox"] {
   color: #817286;
 }
 .stat-card h2 {
-  font-size: 29px;
+  font-size: 33.35px;
   font-weight: 750;
   letter-spacing: -1px;
   margin: 14px 0 19px;
@@ -542,7 +499,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #74736b;
 }
 .stat-foot > span:first-child {
@@ -618,12 +575,12 @@ input[type="checkbox"] {
   gap: 12px;
 }
 .card-heading h3 {
-  font-size: 13px;
+  font-size: 14.95px;
   font-weight: 750;
   letter-spacing: -0.3px;
 }
 .card-heading p {
-  font-size: 10px;
+  font-size: 11.5px;
   color: #74736b;
   margin-top: 7px;
 }
@@ -640,7 +597,7 @@ input[type="checkbox"] {
   border: 1px solid var(--line);
   padding: 7px 9px;
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #78786f;
   white-space: nowrap;
 }
@@ -649,7 +606,7 @@ input[type="checkbox"] {
   justify-content: flex-end;
   gap: 17px;
   margin: 23px 25px 0;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #78786f;
 }
 .chart-legend > span {
@@ -680,7 +637,7 @@ input[type="checkbox"] {
   flex-direction: column;
   justify-content: space-between;
   padding-bottom: 24px;
-  font-size: 8px;
+  font-size: 9.2px;
   color: #74736b;
   width: 28px;
   text-align: right;
@@ -730,7 +687,7 @@ input[type="checkbox"] {
   transition: height 0.4s;
 }
 .bar-group > span {
-  font-size: 9px;
+  font-size: 10.35px;
   color: #74736b;
 }
 .bar-group.selected > span {
@@ -745,7 +702,7 @@ input[type="checkbox"] {
   margin: 17px 22px 0;
   padding: 13px 0;
   color: #78786f;
-  font-size: 9px;
+  font-size: 10.35px;
 }
 .chart-insight > span {
   color: #78786f;
@@ -777,17 +734,17 @@ input[type="checkbox"] {
   flex-direction: column;
 }
 .donut-label > span {
-  font-size: 9px;
+  font-size: 10.35px;
   color: #74736b;
   margin-bottom: 6px;
 }
 .donut-label > strong {
-  font-size: 21px;
+  font-size: 24.15px;
   font-family: Manrope, sans-serif;
   letter-spacing: -0.8px;
 }
 .donut-label > small {
-  font-size: 8px;
+  font-size: 9.2px;
   color: #74736b;
   margin-top: 6px;
 }
@@ -799,7 +756,7 @@ input[type="checkbox"] {
 .spending-legend > div {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #78786f;
 }
 .spending-legend span {
@@ -808,7 +765,7 @@ input[type="checkbox"] {
   gap: 8px;
 }
 .spending-legend strong {
-  font-size: 9px;
+  font-size: 10.35px;
   font-weight: 500;
   color: #6b6b63;
 }
@@ -829,7 +786,7 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10px;
+  font-size: 11.5px;
   color: #6b6b63;
   padding: 1px 0;
   white-space: nowrap;
@@ -848,7 +805,7 @@ table {
   white-space: nowrap;
 }
 th {
-  font-size: 9px;
+  font-size: 10.35px;
   color: #74736b;
   font-weight: 500;
   background: #faf5eb;
@@ -859,7 +816,7 @@ th {
 td {
   padding: 13px 12px;
   border-bottom: 1px solid #faf5eb;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 tr:last-child td {
   border-bottom: 0;
@@ -896,12 +853,12 @@ th:last-child {
   stroke-width: 1.5;
 }
 .transaction-name strong {
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 500;
 }
 .transaction-name small {
   display: block;
-  font-size: 8px;
+  font-size: 9.2px;
   color: #74736b;
   margin-top: 4px;
 }
@@ -911,7 +868,7 @@ th:last-child {
   padding: 4px 6px;
   border-radius: 4px;
   color: #78786f;
-  font-size: 8px;
+  font-size: 9.2px;
 }
 .muted {
   color: #78786f;
@@ -924,7 +881,7 @@ th:last-child {
 }
 .amount {
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12.65px;
   letter-spacing: -0.2px;
 }
 .row-actions {
@@ -960,7 +917,7 @@ th:last-child {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .budget-name {
   display: flex;
@@ -971,15 +928,15 @@ th:last-child {
 .budget-values {
   margin-top: 10px;
   margin-bottom: 9px;
-  font-size: 9px;
+  font-size: 10.35px;
 }
 .budget-values strong {
   font-weight: 600;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .budget-values > span {
   color: #74736b;
-  font-size: 9px;
+  font-size: 10.35px;
 }
 .progress-track {
   height: 5px;
@@ -1000,7 +957,7 @@ th:last-child {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #78786f;
 }
 .gentle-banner {
@@ -1018,13 +975,13 @@ th:last-child {
 }
 .gentle-banner strong {
   display: block;
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 600;
   color: #6b5150;
 }
 .gentle-banner div > span {
   display: block;
-  font-size: 9px;
+  font-size: 10.35px;
   color: #74736b;
   margin-top: 5px;
 }
@@ -1034,14 +991,14 @@ th:last-child {
   gap: 12px;
   align-items: center;
   color: #78786f;
-  font-size: 10px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 .page-footer {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 8px;
+  font-size: 9.2px;
   color: #b7acae;
   padding: 25px 0 23px;
 }
@@ -1063,15 +1020,73 @@ th:last-child {
   gap: 20px;
   margin-bottom: 23px;
 }
+.report-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.report-controls label {
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+.report-controls select {
+  max-width: 100%;
+  font-weight: 400;
+}
+.report-controls > span {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 430px;
+  line-height: 1.7;
+}
+.report-title {
+  padding: 20px;
+  border-top: 1px solid var(--line);
+}
+.report-title h3 {
+  font-size: 16px;
+}
+.report-title p {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 850px;
+}
+.report-group th {
+  background: #eee6ef;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  padding: 13px 22px;
+}
+.report-total td {
+  background: var(--cream);
+  font-weight: 650;
+}
+.grouped-report td.report-cell {
+  white-space: pre-wrap;
+  min-width: 100px;
+  max-width: 290px;
+  overflow-wrap: anywhere;
+}
+.grouped-report td.align-right {
+  font-variant-numeric: tabular-nums;
+}
 .report-summary .card {
   padding: 24px;
 }
 .report-summary span {
   color: #78786f;
-  font-size: 11px;
+  font-size: 12.65px;
 }
 .report-summary h2 {
-  font-size: 28px;
+  font-size: 32.2px;
   margin-top: 12px;
   letter-spacing: -0.8px;
 }
@@ -1097,10 +1112,10 @@ th:last-child {
   border: 0;
   background: transparent;
   width: 100%;
-  font-size: 11px;
+  font-size: 12.65px;
 }
 .filters select {
-  font-size: 11px;
+  font-size: 12.65px;
 }
 .table-footer {
   padding: 17px 22px;
@@ -1108,17 +1123,17 @@ th:last-child {
   color: #74736b;
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .date-filter {
-  font-size: 10px;
+  font-size: 11.5px;
   color: #78786f;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .date-filter input {
-  font-size: 10px;
+  font-size: 11.5px;
   padding: 10px 8px;
 }
 .report-breakdown {
@@ -1127,7 +1142,7 @@ th:last-child {
 }
 .report-breakdown h3 {
   margin-bottom: 20px;
-  font-size: 15px;
+  font-size: 17.25px;
 }
 .breakdown-row {
   display: flex;
@@ -1149,7 +1164,7 @@ th:last-child {
   padding: 17px 20px;
   border-radius: 8px;
   color: #78786f;
-  font-size: 12px;
+  font-size: 13.8px;
   margin-bottom: 24px;
   line-height: 1.7;
 }
@@ -1165,13 +1180,13 @@ th:last-child {
   margin-bottom: 0;
 }
 .budget-item.large .budget-top {
-  font-size: 13px;
+  font-size: 14.95px;
 }
 .budget-item.large .budget-values {
   margin: 20px 0 15px;
 }
 .budget-item.large .budget-values strong {
-  font-size: 23px;
+  font-size: 26.45px;
 }
 .budget-item.large .progress-track {
   height: 7px;
@@ -1202,20 +1217,20 @@ th:last-child {
 }
 .goal-card h3,
 .role-card h3 {
-  font-size: 17px;
+  font-size: 19.55px;
   letter-spacing: -0.5px;
   margin-bottom: 8px;
 }
 .goal-card > p,
 .role-card > p {
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .goal-card h2 {
-  font-size: 24px;
+  font-size: 27.6px;
   margin: 26px 0 16px;
 }
 .goal-card h2 small {
-  font-size: 10px;
+  font-size: 11.5px;
   font-weight: 400;
   color: #74736b;
   display: block;
@@ -1224,7 +1239,7 @@ th:last-child {
 .goal-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11.5px;
   color: #78786f;
   margin-top: 13px;
 }
@@ -1248,11 +1263,11 @@ th:last-child {
   border: 0;
 }
 .category-row strong {
-  font-size: 12px;
+  font-size: 13.8px;
   font-weight: 500;
 }
 .category-row small {
-  font-size: 10px;
+  font-size: 11.5px;
   color: #74736b;
   display: block;
   margin-top: 5px;
@@ -1262,7 +1277,7 @@ th:last-child {
 }
 .active-status {
   color: #78786f;
-  font-size: 10px;
+  font-size: 11.5px;
   display: flex;
   gap: 6px;
   align-items: center;
@@ -1282,7 +1297,7 @@ th:last-child {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12.65px;
   color: #6b6b63;
 }
 .permission-list > div.disabled-permission {
@@ -1298,11 +1313,11 @@ th:last-child {
   color: #78786f;
 }
 .empty h3 {
-  font-size: 15px;
+  font-size: 17.25px;
   color: #6b6b63;
 }
 .empty p {
-  font-size: 11px;
+  font-size: 12.65px;
   line-height: 1.7;
 }
 .toast {
@@ -1320,7 +1335,7 @@ th:last-child {
   align-items: center;
   gap: 11px;
   z-index: 100;
-  font-size: 12px;
+  font-size: 13.8px;
   max-width: calc(100% - 32px);
 }
 .modal-backdrop {
@@ -1352,11 +1367,11 @@ th:last-child {
   margin-bottom: 25px;
 }
 .modal-heading h2 {
-  font-size: 23px;
+  font-size: 26.45px;
   letter-spacing: -0.8px;
 }
 .modal-heading .eyebrow {
-  font-size: 8px;
+  font-size: 9.2px;
   margin-bottom: 7px;
 }
 .modal-heading > button {
@@ -1378,7 +1393,7 @@ th:last-child {
   padding: 9px;
   border-radius: 5px;
   color: #74736b;
-  font-size: 12px;
+  font-size: 13.8px;
 }
 .type-toggle > button.selected {
   color: #6b6b63;
@@ -1394,7 +1409,7 @@ th:last-child {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 11px;
+  font-size: 12.65px;
   color: #6b6b63;
   font-weight: 500;
 }
@@ -1402,7 +1417,7 @@ th:last-child {
 .form-fields select,
 .form-fields textarea {
   width: 100%;
-  font-size: 12px;
+  font-size: 13.8px;
 }
 .form-fields input[type="color"] {
   width: 60px;
@@ -1446,7 +1461,7 @@ th:last-child {
   background: #faf5eb;
   color: #9c160e;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13.8px;
   line-height: 1.6;
 }
 .danger {
@@ -1461,13 +1476,13 @@ th:last-child {
   width: 410px;
 }
 .confirm-modal h2 {
-  font-size: 22px;
+  font-size: 25.3px;
   margin: 20px 0 12px;
 }
 .confirm-modal > p {
   line-height: 1.8;
   color: #78786f;
-  font-size: 12px;
+  font-size: 13.8px;
 }
 .delete-icon {
   display: inline-flex;
@@ -1512,10 +1527,10 @@ th:last-child {
 }
 .auth-story .eyebrow {
   color: #f4d9c7;
-  font-size: 10px;
+  font-size: 11.5px;
 }
 .auth-story h1 {
-  font-size: 45px;
+  font-size: 51.75px;
   line-height: 1.35;
   letter-spacing: -2px;
   margin: 20px 0;
@@ -1524,11 +1539,11 @@ th:last-child {
   max-width: 350px;
   line-height: 1.9;
   color: #f4d9c7;
-  font-size: 14px;
+  font-size: 16.1px;
 }
 .auth-story > small {
   color: #e9c1b6;
-  font-size: 11px;
+  font-size: 12.65px;
 }
 .auth-form {
   width: 350px;
@@ -1539,22 +1554,22 @@ th:last-child {
   gap: 20px;
 }
 .mini-label {
-  font-size: 9px;
+  font-size: 10.35px;
   letter-spacing: 1.7px;
   color: #74736b;
 }
 .auth-form h1 {
-  font-size: 30px;
+  font-size: 34.5px;
   letter-spacing: -1px;
 }
 .auth-form > p {
-  font-size: 12px;
+  font-size: 13.8px;
   color: #74736b;
   line-height: 1.6;
   margin-bottom: 6px;
 }
 .auth-form > small {
-  font-size: 10px;
+  font-size: 11.5px;
   color: #74736b;
 }
 .auth-form .btn {
@@ -1572,7 +1587,7 @@ th:last-child {
   gap: 20px;
 }
 .loading h2 {
-  font-size: 25px;
+  font-size: 28.75px;
   letter-spacing: -0.7px;
 }
 .spin {
@@ -1598,10 +1613,10 @@ th:last-child {
     padding: 24px;
   }
   .stat-card h2 {
-    font-size: 34px;
+    font-size: 39.1px;
   }
   .card-heading h3 {
-    font-size: 15px;
+    font-size: 17.25px;
   }
   .bar-chart {
     height: 225px;
@@ -1615,28 +1630,28 @@ th:last-child {
     gap: 13px;
   }
   .nav-item {
-    font-size: 13px;
+    font-size: 14.95px;
   }
   .topbar {
     padding: 0 48px;
   }
   .page-heading h1 {
-    font-size: 29px;
+    font-size: 33.35px;
   }
   .page-heading p {
-    font-size: 12px;
+    font-size: 13.8px;
   }
   .stat-top {
-    font-size: 12px;
+    font-size: 13.8px;
   }
   .stat-foot {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   td {
     padding: 16px 12px;
   }
   .transaction-name strong {
-    font-size: 11px;
+    font-size: 12.65px;
   }
   .budget-item {
     margin-bottom: 26px;
@@ -1654,7 +1669,7 @@ th:last-child {
     margin-left: 215px;
   }
   .brand {
-    font-size: 19px;
+    font-size: 21.85px;
   }
   .main-content {
     padding: 27px 24px 0;
@@ -1668,7 +1683,7 @@ th:last-child {
     gap: 8px;
   }
   .page-heading h1 {
-    font-size: 24px;
+    font-size: 27.6px;
   }
   .heading-actions {
     padding-top: 5px;
@@ -1680,10 +1695,10 @@ th:last-child {
     padding: 16px 13px;
   }
   .stat-card h2 {
-    font-size: 25px;
+    font-size: 28.75px;
   }
   .stat-foot {
-    font-size: 8px;
+    font-size: 9.2px;
     gap: 3px;
   }
   .charts-grid,
@@ -1699,7 +1714,7 @@ th:last-child {
     padding: 19px 17px 0;
   }
   .chart-insight {
-    font-size: 8px;
+    font-size: 9.2px;
   }
   .budget-list {
     padding: 24px 17px 0;
@@ -1713,10 +1728,10 @@ th:last-child {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .nav-item {
-    font-size: 11px;
+    font-size: 12.65px;
   }
   .together-card h4 {
-    font-size: 10px;
+    font-size: 11.5px;
   }
 }
 @media (max-width: 980px) {
@@ -1728,25 +1743,19 @@ th:last-child {
     margin-left: 195px;
   }
   .sidebar .brand {
-    font-size: 17px;
+    font-size: 19.55px;
     gap: 7px;
   }
   .sidebar .brand-icon {
     height: 32px;
     width: 32px;
   }
-  .family-space {
-    padding: 9px 7px;
-  }
-  .family-space strong {
-    font-size: 10px;
-  }
   .nav-item {
     gap: 9px;
     padding: 11px 10px;
   }
   .manage-label {
-    font-size: 7px;
+    font-size: 8.05px;
     letter-spacing: 1px;
   }
   .stat-grid {
@@ -1756,10 +1765,10 @@ th:last-child {
     padding: 19px;
   }
   .stat-card h2 {
-    font-size: 29px;
+    font-size: 33.35px;
   }
   .stat-foot {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .charts-grid,
   .lower-grid {
@@ -1782,7 +1791,7 @@ th:last-child {
   }
   .spending-legend > div,
   .spending-legend strong {
-    font-size: 11px;
+    font-size: 12.65px;
   }
   .budget-list {
     display: grid;
@@ -1797,7 +1806,7 @@ th:last-child {
     line-height: 1.7;
   }
   .gentle-banner button {
-    font-size: 9px;
+    font-size: 10.35px;
   }
   .main-content {
     padding: 27px 22px 0;
@@ -1810,19 +1819,19 @@ th:last-child {
   }
   .breadcrumb {
     gap: 8px;
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .demo-badge {
-    font-size: 8px;
+    font-size: 9.2px;
   }
   .bar-chart {
     height: 210px;
   }
   .chart-insight {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .page-footer {
-    font-size: 7px;
+    font-size: 8.05px;
   }
   .category-grid {
     gap: 16px;
@@ -1831,7 +1840,7 @@ th:last-child {
     padding: 35px;
   }
   .auth-story h1 {
-    font-size: 35px;
+    font-size: 40.25px;
   }
 }
 @media (max-width: 720px) {
@@ -1844,7 +1853,7 @@ th:last-child {
     transform: translateX(0);
   }
   .sidebar .brand {
-    font-size: 21px;
+    font-size: 24.15px;
   }
   .sidebar-scrim {
     position: fixed;
@@ -1868,7 +1877,7 @@ th:last-child {
     display: none;
   }
   .breadcrumb strong {
-    font-size: 12px;
+    font-size: 13.8px;
   }
   .topbar-right {
     gap: 8px;
@@ -1883,11 +1892,11 @@ th:last-child {
     margin-bottom: 24px;
   }
   .page-heading h1 {
-    font-size: 23px;
+    font-size: 26.45px;
     letter-spacing: -1px;
   }
   .page-heading p {
-    font-size: 10px;
+    font-size: 11.5px;
     line-height: 1.7;
   }
   .heading-actions {
@@ -1896,7 +1905,7 @@ th:last-child {
     margin-top: 10px;
   }
   .month-picker {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .stat-grid {
     gap: 11px;
@@ -1906,14 +1915,14 @@ th:last-child {
     padding: 16px 13px;
   }
   .stat-top {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .stat-card h2 {
-    font-size: 25px;
+    font-size: 28.75px;
     margin: 14px 0;
   }
   .stat-foot {
-    font-size: 8px;
+    font-size: 9.2px;
     flex-wrap: wrap;
     gap: 5px;
   }
@@ -1930,10 +1939,10 @@ th:last-child {
     gap: 18px;
   }
   .card-heading h3 {
-    font-size: 13px;
+    font-size: 14.95px;
   }
   .chart-insight {
-    font-size: 8px;
+    font-size: 9.2px;
   }
   .bar {
     width: 16px;
@@ -1947,7 +1956,7 @@ th:last-child {
     height: 160px;
   }
   .donut-label > strong {
-    font-size: 19px;
+    font-size: 21.85px;
   }
   .spending-legend {
     padding: 20px 16px 20px 0;
@@ -1955,7 +1964,7 @@ th:last-child {
   }
   .spending-legend > div,
   .spending-legend strong {
-    font-size: 9px;
+    font-size: 10.35px;
   }
   .recent-card th:nth-child(3),
   .recent-card td:nth-child(3) {
@@ -1970,38 +1979,38 @@ th:last-child {
     padding-left: 17px;
   }
   .transaction-name strong {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .budget-list {
     gap: 12px;
   }
   .budget-name {
-    font-size: 9px;
+    font-size: 10.35px;
     gap: 4px;
   }
   .budget-top > .muted {
-    font-size: 8px;
+    font-size: 9.2px;
   }
   .budget-values strong {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .gentle-banner {
     padding: 17px 13px;
     gap: 9px;
   }
   .gentle-banner strong {
-    font-size: 9px;
+    font-size: 10.35px;
   }
   .gentle-banner div > span {
-    font-size: 8px;
+    font-size: 9.2px;
     max-width: 200px;
   }
   .gentle-banner button {
     gap: 4px;
-    font-size: 9px;
+    font-size: 10.35px;
   }
   .page-footer {
-    font-size: 8px;
+    font-size: 9.2px;
     flex-direction: column;
     align-items: center;
     gap: 8px;
@@ -2014,10 +2023,10 @@ th:last-child {
     padding: 14px 11px;
   }
   .report-summary h2 {
-    font-size: 20px;
+    font-size: 23px;
   }
   .report-summary span {
-    font-size: 10px;
+    font-size: 11.5px;
   }
   .filters {
     padding: 15px;
@@ -2037,19 +2046,19 @@ th:last-child {
     grid-template-columns: 1fr;
   }
   .info-strip {
-    font-size: 10px;
+    font-size: 11.5px;
     padding: 14px;
   }
   .toast {
     left: 50%;
-    font-size: 11px;
+    font-size: 12.65px;
     width: max-content;
   }
   .modal {
     padding: 24px 20px;
   }
   .modal-heading h2 {
-    font-size: 22px;
+    font-size: 25.3px;
   }
   .form-grid {
     gap: 11px;
@@ -2069,7 +2078,7 @@ th:last-child {
     gap: 30px;
   }
   .auth-story h1 {
-    font-size: 29px;
+    font-size: 33.35px;
     margin: 10px 0;
   }
   .auth-story > small,
@@ -2077,27 +2086,57 @@ th:last-child {
     display: none;
   }
   .auth-story .brand {
-    font-size: 21px;
+    font-size: 24.15px;
   }
   .auth-form {
     padding: 35px 0;
     gap: 18px;
   }
   .auth-form h1 {
-    font-size: 27px;
+    font-size: 31.05px;
   }
   .auth-form > p {
-    font-size: 12px;
+    font-size: 13.8px;
   }
   .demo-badge {
     padding: 4px 6px;
   }
   .language-button {
-    font-size: 10px;
+    font-size: 11.5px;
     gap: 4px;
   }
 }
+@media (max-width: 360px) {
+  .heading-actions {
+    flex-wrap: wrap;
+  }
+  .stat-grid,
+  .report-summary,
+  .budget-list {
+    grid-template-columns: 1fr;
+  }
+  .spending-card {
+    grid-template-columns: 1fr;
+  }
+  .spending-legend {
+    padding: 0 20px 20px;
+  }
+}
+@media (max-width: 600px) {
+  .report-summary {
+    grid-template-columns: 1fr;
+  }
+}
 @media print {
+  .report-controls {
+    display: none;
+  }
+  .grouped-report thead {
+    display: table-header-group;
+  }
+  .grouped-report tr {
+    break-inside: avoid;
+  }
   .sidebar,
   .topbar,
   .heading-actions,
@@ -2142,4 +2181,92 @@ th:last-child {
     transition: none !important;
     animation: none !important;
   }
+}
+.statement-table {
+  min-width: 600px;
+  table-layout: fixed;
+}
+.statement-table th:nth-child(3),
+.statement-table td:nth-child(3),
+.statement-sides th + th {
+  border-left: 1px solid #ddd3c6;
+}
+.statement-sides th {
+  background: #b70704;
+  color: #fffaf0;
+  font-size: 16px;
+}
+.report-balance th {
+  padding: 14px 22px;
+  text-align: right;
+  background: #fff3df;
+}
+
+.password-input {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.password-input input {
+  width: 100%;
+  padding-right: 48px;
+}
+.password-input .password-visibility {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.password-input .password-visibility:hover {
+  color: var(--primary);
+}
+.password-input .password-visibility:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.permission-matrix {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.permission-matrix fieldset {
+  margin: 0;
+  padding: 10px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.permission-matrix legend {
+  padding-right: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.permission-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+.permission-options label,
+.permission-options span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.permission-options input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
 }

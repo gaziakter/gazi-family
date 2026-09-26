@@ -1,4 +1,5 @@
 "use client";
+import PasswordInput from "./password-input";
 import { useState, type FormEvent } from "react";
 import { X, LockKeyhole, Check } from "lucide-react";
 export default function PasswordDialog({ close }: { close: () => void }) {
@@ -58,9 +59,8 @@ export default function PasswordDialog({ close }: { close: () => void }) {
             <div className="form-fields">
               <label>
                 Current password
-                <input
+                <PasswordInput
                   autoFocus
-                  type="password"
                   name="currentPassword"
                   required
                   maxLength={128}
@@ -69,8 +69,7 @@ export default function PasswordDialog({ close }: { close: () => void }) {
               </label>
               <label>
                 New password
-                <input
-                  type="password"
+                <PasswordInput
                   name="password"
                   required
                   minLength={10}
@@ -80,8 +79,7 @@ export default function PasswordDialog({ close }: { close: () => void }) {
               </label>
               <label>
                 Confirm new password
-                <input
-                  type="password"
+                <PasswordInput
                   name="confirm"
                   required
                   minLength={10}

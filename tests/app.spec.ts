@@ -4,6 +4,76 @@ const credentials = {
   email: "owner@test.invalid",
   password: "Owner-test-password-123",
 };
+test("all grouped reports export PDF and date ranges work across months", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/demo");
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
+  await page.getByLabel("From", { exact: true }).fill("2020-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2099-01-01");
+  await expect(page.getByLabel("Report month", { exact: true })).toHaveCount(0);
+  await page.getByLabel("To", { exact: true }).fill("2019-01-01");
+  await expect(page.getByRole("button", { name: "Export PDF" })).toBeDisabled();
+  await page.getByLabel("To", { exact: true }).fill("2099-01-01");
+  for (const mode of [
+    "transactions-date",
+    "transactions-head",
+    "statement-date",
+    "statement-month",
+  ]) {
+    await page
+      .getByRole("combobox", { name: "Report type" })
+      .selectOption(mode);
+    if (mode === "statement-month") {
+      await expect(page.getByLabel("From", { exact: true })).toHaveCount(0);
+      await page.getByLabel("Report month", { exact: true }).fill("2026-09");
+      await expect(page.locator(".report-group")).toHaveCount(1);
+      await expect(page.locator(".report-group")).toContainText("2026-09");
+    } else {
+      await expect(page.getByLabel("From", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("To", { exact: true })).toBeVisible();
+      await expect(
+        page.getByLabel("Report month", { exact: true }),
+      ).toHaveCount(0);
+    }
+    await expect(page.locator(".report-group").first()).toBeVisible();
+    const requestPromise = page.waitForRequest((r) =>
+      r.url().endsWith("/api/reports/pdf"),
+    );
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export PDF" }).click();
+    expect((await download).suggestedFilename()).toContain(mode);
+    const payload = (await requestPromise).postDataJSON();
+    expect(payload.period).toBe(mode === "statement-month" ? "month" : "date");
+    if (mode === "statement-month") {
+      expect(payload.month).toBe("2026-09");
+      expect(payload.from).toBe("");
+      expect(payload.to).toBe("");
+    }
+  }
+  await page.screenshot({
+    path: "test-results/trial-report-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page
+      .locator(".report-summary h2")
+      .evaluateAll((nodes) =>
+        nodes.every((node) => node.scrollWidth <= node.clientWidth),
+      ),
+  ).toBeTruthy();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "test-results/trial-report-mobile.png",
+    fullPage: true,
+  });
+});
 test("setup, server authorization, persistence and relational validation", async ({
   playwright,
 }) => {
@@ -172,6 +242,148 @@ test("setup, server authorization, persistence and relational validation", async
       })
     ).status(),
   ).toBe(403);
+  const limitedRole = data.roles.find(
+    (r: { name: string }) => r.name === "Limited",
+  );
+  const restricted = await (await viewer.get("/api/data")).json();
+  for (const collection of ["transactions", "categories", "budgets", "goals"])
+    expect(restricted[collection]).toEqual([]);
+  expect(restricted.users).toHaveLength(1);
+  expect(restricted.roles).toHaveLength(1);
+  // Every resource checks the requested operation, even for direct API requests.
+  for (const collection of [
+    "transactions",
+    "categories",
+    "budgets",
+    "goals",
+    "users",
+    "roles",
+  ]) {
+    for (const granted of ["create", "update", "delete"]) {
+      expect(
+        (
+          await save(
+            "roles",
+            { name: "Limited", permissions: [collection + "." + granted] },
+            limitedRole.id,
+          )
+        ).ok(),
+      ).toBeTruthy();
+      for (const operation of ["create", "update", "delete"]) {
+        const response = await viewer.post("/api/data", {
+          data: {
+            collection,
+            action: operation === "delete" ? "delete" : "save",
+            ...(operation === "create" ? {} : { id: "missing-record" }),
+            values: {},
+          },
+        });
+        expect(response.status()).toBe(operation === granted ? 400 : 403);
+      }
+    }
+  }
+  await save(
+    "roles",
+    {
+      name: "Limited",
+      permissions: ["transactions.read", "transactions.create"],
+    },
+    limitedRole.id,
+  );
+  const visible = await (await viewer.get("/api/data")).json();
+  expect(visible.transactions.length).toBeGreaterThan(0);
+  const transaction = {
+    title: "CRUD permission check",
+    type: "expense",
+    amount: 25,
+    date: "2026-09-26",
+    account: "Cash",
+    categoryId: grocery.id,
+    note: "",
+  };
+  expect(
+    (
+      await viewer.post("/api/data", {
+        data: {
+          collection: "transactions",
+          action: "save",
+          values: transaction,
+        },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  const created = (
+    await (await viewer.get("/api/data")).json()
+  ).transactions.find((t: { title: string }) => t.title === transaction.title);
+  await save(
+    "roles",
+    { name: "Limited", permissions: ["transactions.update"] },
+    limitedRole.id,
+  );
+  expect(
+    (
+      await viewer.post("/api/data", {
+        data: {
+          collection: "transactions",
+          action: "save",
+          id: created.id,
+          values: { ...transaction, amount: 30 },
+        },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  await save(
+    "roles",
+    { name: "Limited", permissions: ["transactions.delete"] },
+    limitedRole.id,
+  );
+  expect(
+    (
+      await viewer.post("/api/data", {
+        data: { collection: "transactions", action: "delete", id: created.id },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  await save(
+    "roles",
+    { name: "Limited", permissions: ["reports.read"] },
+    limitedRole.id,
+  );
+  const reportFilters = {
+    demo: false,
+    month: "2026-09",
+    period: "month",
+    account: "all",
+    categoryId: "all",
+    memberId: "all",
+    search: "",
+    from: "",
+    to: "",
+  };
+  expect(
+    (
+      await anonymous.post("/api/reports/pdf", { data: reportFilters })
+    ).status(),
+  ).toBe(401);
+  expect(
+    (await viewer.post("/api/reports/pdf", { data: reportFilters })).status(),
+  ).toBe(403);
+  const pdf = await owner.post("/api/reports/pdf", { data: reportFilters });
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
+  expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
+  expect(
+    (
+      await owner.post("/api/reports/pdf", {
+        data: {
+          ...reportFilters,
+          period: "date",
+          from: "2026-10-01",
+          to: "2026-09-01",
+        },
+      })
+    ).status(),
+  ).toBe(400);
   const oldSession = await owner.storageState();
   expect(
     (
@@ -238,8 +450,8 @@ test("real member login, add and edit transaction, export report", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Reports", exact: true }).click();
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
-  expect((await download).suggestedFilename()).toMatch(/gazi-family-.*\.csv/);
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  expect((await download).suggestedFilename()).toMatch(/gazi-family-.*\.pdf/);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Welcome home" }),

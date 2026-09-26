@@ -1,12 +1,93 @@
 export const permissions = [
-  "transactions.write",
-  "categories.write",
-  "budgets.write",
-  "goals.write",
-  "users.manage",
-  "roles.manage",
+  "transactions.read",
+  "transactions.create",
+  "transactions.update",
+  "transactions.delete",
+  "categories.read",
+  "categories.create",
+  "categories.update",
+  "categories.delete",
+  "budgets.read",
+  "budgets.create",
+  "budgets.update",
+  "budgets.delete",
+  "goals.read",
+  "goals.create",
+  "goals.update",
+  "goals.delete",
+  "users.read",
+  "users.create",
+  "users.update",
+  "users.delete",
+  "roles.read",
+  "roles.create",
+  "roles.update",
+  "roles.delete",
   "reports.read",
+  "reports.export",
 ] as const;
+export const permissionGroups = [
+  {
+    key: "transactions",
+    label: "Transactions (Income & Expense)",
+    actions: ["read", "create", "update", "delete"],
+  },
+  {
+    key: "categories",
+    label: "Categories",
+    actions: ["read", "create", "update", "delete"],
+  },
+  {
+    key: "budgets",
+    label: "Budgets",
+    actions: ["read", "create", "update", "delete"],
+  },
+  {
+    key: "goals",
+    label: "Savings goals",
+    actions: ["read", "create", "update", "delete"],
+  },
+  {
+    key: "users",
+    label: "Family members",
+    actions: ["read", "create", "update", "delete"],
+  },
+  {
+    key: "roles",
+    label: "Roles & permissions",
+    actions: ["read", "create", "update", "delete"],
+  },
+  { key: "reports", label: "Reports", actions: ["read", "export"] },
+];
+export const permissionLabels: Record<string, string> = {
+  read: "View",
+  create: "Create",
+  update: "Update",
+  delete: "Delete",
+  export: "Export PDF",
+};
+export const readPermissions = [
+  "transactions.read",
+  "categories.read",
+  "budgets.read",
+  "goals.read",
+  "users.read",
+  "roles.read",
+];
+export const memberPermissions = [
+  ...readPermissions,
+  "transactions.create",
+  "transactions.update",
+  "transactions.delete",
+  "reports.read",
+  "reports.export",
+];
+export const viewerPermissions = [
+  ...readPermissions,
+  "reports.read",
+  "reports.export",
+];
+
 export type Role = { id: string; name: string; permissions: string[] };
 export type Member = {
   id: string;
@@ -69,9 +150,4 @@ export function totals(entries: Entry[]) {
     expense,
     balance: Math.round((income - expense) * 100) / 100,
   };
-}
-export function csvCell(value: unknown) {
-  let s = String(value ?? "");
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return '"' + s.replaceAll('"', '""') + '"';
 }

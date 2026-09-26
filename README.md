@@ -1,6 +1,6 @@
 # Gazi Family
 
-A personal family account manager built with Next.js App Router, React, PostgreSQL and Prisma. The responsive dashboard includes income and expense records, categories, monthly budgets, savings goals, family members, editable roles, monthly reports, category breakdowns, CSV export and print reports. Navigation and dashboard labels can switch between English and Bengali; amounts use BDT.
+A personal family account manager built with Next.js App Router, React, PostgreSQL and Prisma. The responsive dashboard includes income and expense records, categories, monthly budgets, savings goals, family members, editable roles, monthly reports, category breakdowns, PDF export and print reports. Navigation and dashboard labels can switch between English and Bengali; amounts use BDT.
 
 ## Preview
 
@@ -59,13 +59,17 @@ Browser/integration tests require `npx playwright install chromium`, a productio
 - Passwords use salted scrypt; opaque session tokens are hashed in PostgreSQL. Sessions expire after seven days. Mutation requests check same-origin headers. Login attempts are limited per email per server process; use a shared rate limiter if deploying multiple server instances.
 - Click your avatar in the top bar to change your password. Changing it revokes all previous sessions, then signs the current browser back in. Owners can reset another member's password through the member editor.
 - Monetary columns use PostgreSQL decimal values. Transactions accept positive values with at most two decimal places; income/expense determines the sign. Balances derive from transactions; accounts are Cash, Bank, bKash and Nagad.
-- Reports support monthly, yearly and all-time views, optional date bounds, category, account, family member and search. CSV export includes the filtered rows and escapes spreadsheet formulas. Printing uses the browser's print dialog.
+- Reports support monthly, yearly and all-time views, optional date bounds, category, account, family member and search. PDF export includes the filtered rows, totals, selected filters, embedded Bengali text and automatic pagination. Printing uses the browser's print dialog.
+- Transaction reports group by date or by head (income/expense category), with group subtotals. Income & Expense Statements group by date or month, with income heads on the left and expense heads on the right, side totals, and surplus or deficit. All four report types export to PDF using the same grouping and calculations as the screen.
+- Selecting From/To switches to a custom date range, including ranges across multiple months. An inverted date range is rejected. The month/year/all-time period selectors remain available.
 - Monthly budgets calculate spending automatically. Savings goals are manual planning records, tracked separately from ledger balances to avoid double-counting.
 - Categories, roles or members used by existing records cannot be deleted. Transaction editors preserve the original recording member. Categories in use cannot change their income/expense type.
 - English/Bengali support currently covers navigation and dashboard labels; management forms and validation messages are in English.
 
 ## Backups
 
-Back up PostgreSQL regularly with `pg_dump` and restore with `pg_restore`; CSV exports are reports, not a full database backup. The Docker volume persists database contents between restarts. Never run `docker compose down -v` unless you intend to erase that data.
+Back up PostgreSQL regularly with `pg_dump` and restore with `pg_restore`; PDF exports are reports, not a full database backup. The Docker volume persists database contents between restarts. Never run `docker compose down -v` unless you intend to erase that data.
 
 Implementation references: [Next.js App Router](https://nextjs.org/docs/app) and [Prisma 6 PostgreSQL schema](https://www.prisma.io/docs/v6/orm/prisma-schema/overview/data-sources).
+
+Roles use separate View, Create, Update and Delete permissions for transactions, categories, budgets, savings goals, family members and roles. Reports use View and Export PDF. API requests enforce each action; read access filters returned data. Forms and reports may receive category names and member names as lookup data, while member emails and full role permissions require their respective View access. The current user always receives their own profile and role. Existing roles retain their previous access through the CRUD migration. Delegated administrators cannot grant or assign permissions they do not hold.

@@ -59,29 +59,34 @@ const schemas = {
   }),
   roles: z.object({ name: text, permissions: z.array(z.enum(permissions)) }),
 };
-const access = {
-  transactions: "transactions.write",
-  categories: "categories.write",
-  budgets: "budgets.write",
-  goals: "goals.write",
-  users: "users.manage",
-  roles: "roles.manage",
-};
 export async function GET() {
   try {
     const user = await currentUser();
     if (!user)
       return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    const can = (p: string) => user.role.permissions.includes(p);
+    const ledger = can("transactions.read") || can("reports.read");
+    const categoryLookup =
+      ledger ||
+      [
+        "transactions.create",
+        "transactions.update",
+        "budgets.read",
+        "budgets.create",
+        "budgets.update",
+      ].some(can);
+    const roleLookup =
+      can("users.read") || can("users.create") || can("users.update");
     const [transactions, categories, users, roles, budgets, goals] =
       await Promise.all([
-        db.transaction.findMany({ orderBy: { date: "desc" } }),
-        db.category.findMany(),
+        ledger ? db.transaction.findMany({ orderBy: { date: "desc" } }) : [],
+        can("categories.read") || categoryLookup ? db.category.findMany() : [],
         db.user.findMany({
           select: { id: true, name: true, email: true, roleId: true },
         }),
         db.role.findMany(),
-        db.budget.findMany(),
-        db.goal.findMany(),
+        can("budgets.read") ? db.budget.findMany() : [],
+        can("goals.read") ? db.goal.findMany() : [],
       ]);
     return NextResponse.json({
       transactions: transactions.map((t) => ({
@@ -90,8 +95,20 @@ export async function GET() {
         date: t.date.toISOString().slice(0, 10),
       })),
       categories,
-      users,
-      roles,
+      users: users
+        .filter((u) => u.id === user.id || can("users.read") || ledger)
+        .map((u) =>
+          u.id === user.id || can("users.read")
+            ? u
+            : { ...u, email: "", roleId: "" },
+        ),
+      roles: roles
+        .filter((r) => r.id === user.roleId || can("roles.read") || roleLookup)
+        .map((r) =>
+          r.id === user.roleId || can("roles.read")
+            ? r
+            : { ...r, permissions: [] },
+        ),
       budgets: budgets.map((b) => ({ ...b, amount: Number(b.amount) })),
       goals: goals.map((g) => ({
         ...g,
@@ -130,11 +147,16 @@ export async function POST(req: Request) {
         values: z.unknown().optional(),
       })
       .parse(await req.json());
-    if (!user.role.permissions.includes(access[collection]))
+    if (
+      !user.role.permissions.includes(
+        `${collection}.${action === "delete" ? "delete" : id ? "update" : "create"}`,
+      )
+    )
       return NextResponse.json(
         { error: "Your role does not allow this action." },
         { status: 403 },
       );
+    const canGrant = (p: string) => user.role.permissions.includes(p);
     await db.$transaction(
       async (tx) => {
         if (action === "delete") {
@@ -150,6 +172,10 @@ export async function POST(req: Request) {
           }
           if (collection === "roles") {
             const role = await tx.role.findUniqueOrThrow({ where: { id } });
+            if (role.permissions.some((p) => !canGrant(p)))
+              throw Error(
+                "You cannot assign a role with permissions you do not have.",
+              );
             if (role.name === "Owner")
               throw Error("The Owner role is protected.");
             await tx.role.delete({ where: { id } });
@@ -207,6 +233,8 @@ export async function POST(req: Request) {
         }
         if (collection === "roles") {
           const data = schemas.roles.parse(values);
+          if (data.permissions.some((p) => !canGrant(p)))
+            throw Error("You cannot grant permissions you do not have.");
           if (data.name.toLowerCase() === "owner")
             throw Error("The Owner role is protected.");
           if (id) {
@@ -221,6 +249,10 @@ export async function POST(req: Request) {
           const role = await tx.role.findUniqueOrThrow({
             where: { id: data.roleId },
           });
+          if (role.permissions.some((p) => !canGrant(p)))
+            throw Error(
+              "You cannot assign a role with permissions you do not have.",
+            );
           if (role.name === "Owner")
             throw Error("The Owner role cannot be assigned.");
           if (id) {
