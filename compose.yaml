@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gazi
+      POSTGRES_PASSWORD: gazi_local_password
+      POSTGRES_DB: gazi_family
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - gazi_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gazi -d gazi_family"]
+      interval: 5s
+      retries: 10
+volumes:
+  gazi_data:

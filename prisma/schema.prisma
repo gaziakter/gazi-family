@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Family {
+  id String @id @default("gazi-family")
+  createdAt DateTime @default(now())
+}
+model Role {
+  id String @id @default(cuid())
+  name String @unique
+  permissions String[]
+  users User[]
+}
+model User {
+  id String @id @default(cuid())
+  name String
+  email String @unique
+  passwordHash String
+  roleId String
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  sessions Session[]
+  transactions Transaction[]
+  createdAt DateTime @default(now())
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+}
+model Category {
+  id String @id @default(cuid())
+  name String
+  type String
+  color String @default("#297665")
+  transactions Transaction[]
+  budgets Budget[]
+  @@unique([name, type])
+}
+model Transaction {
+  id String @id @default(cuid())
+  title String
+  type String
+  amount Decimal @db.Decimal(14, 2)
+  date DateTime @db.Date
+  account String
+  note String @default("")
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([date, type])
+}
+model Budget {
+  id String @id @default(cuid())
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  month String
+  amount Decimal @db.Decimal(14, 2)
+  @@unique([categoryId, month])
+}
+model Goal {
+  id String @id @default(cuid())
+  name String
+  target Decimal @db.Decimal(14, 2)
+  saved Decimal @db.Decimal(14, 2)
+  date DateTime @db.Date
+}
