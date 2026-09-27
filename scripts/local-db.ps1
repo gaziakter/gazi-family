@@ -33,4 +33,4 @@ try {
   $exists=& (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55432 -U gazi -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='gazi_family'"
   if ($exists -ne '1') { & (Join-Path $pgBin 'createdb.exe') -h 127.0.0.1 -p 55432 -U gazi gazi_family; if ($LASTEXITCODE -ne 0) { throw 'Database creation failed.' } }
 } finally { Remove-Item Env:PGPASSWORD }
-Write-Output 'Gazi Family PostgreSQL is ready on localhost:55432. Run npm.cmd run db:deploy.'
+Write-Output 'Happy Family PostgreSQL is ready on localhost:55432. Run npm.cmd run db:deploy.'

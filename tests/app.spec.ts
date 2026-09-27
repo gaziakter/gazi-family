@@ -120,6 +120,15 @@ test("setup, server authorization, persistence and relational validation", async
     });
   expect(
     (
+      await save(
+        "accounts",
+        { name: "Cash", type: "Cash", openingBalance: 50000, active: true },
+        "Cash",
+      )
+    ).ok(),
+  ).toBeTruthy();
+  expect(
+    (
       await save("transactions", {
         title: "Test groceries",
         type: "expense",
@@ -250,6 +259,16 @@ test("setup, server authorization, persistence and relational validation", async
     expect(restricted[collection]).toEqual([]);
   expect(restricted.users).toHaveLength(1);
   expect(restricted.roles).toHaveLength(1);
+  expect(restricted.accounts).toEqual([]);
+  expect(restricted.transfers).toEqual([]);
+  for (const collection of ["accounts", "transfers"])
+    expect(
+      (
+        await viewer.post("/api/data", {
+          data: { collection, action: "save", values: {} },
+        })
+      ).status(),
+    ).toBe(403);
   // Every resource checks the requested operation, even for direct API requests.
   for (const collection of [
     "transactions",
@@ -451,7 +470,9 @@ test("real member login, add and edit transaction, export report", async ({
   await page.getByRole("button", { name: "Reports", exact: true }).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PDF" }).click();
-  expect((await download).suggestedFilename()).toMatch(/gazi-family-.*\.pdf/);
+  expect((await download).suggestedFilename()).toMatch(
+    /happy-family-.*\.pdf/,
+  );
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Welcome home" }),
@@ -513,4 +534,410 @@ test("demo dashboard, filters, modal persistence and mobile layout", async ({
     page.getByRole("heading", { name: "Savings goals", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("bank accounts, transfers, overdraft protection and concurrent spending", async ({
+  playwright,
+}) => {
+  const owner = await playwright.request.newContext({
+    baseURL: origin,
+    extraHTTPHeaders: { Origin: origin },
+  });
+  try {
+    expect(
+      (
+        await owner.post("/api/auth", {
+          data: { action: "login", ...credentials },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    const save = (collection: string, values: object, id?: string) =>
+      owner.post("/api/data", {
+        data: { collection, action: "save", values, id },
+      });
+    const remove = (collection: string, id: string) =>
+      owner.post("/api/data", { data: { collection, action: "delete", id } });
+    const read = async () => await (await owner.get("/api/data")).json();
+    const initial = await read();
+    const categoryId = initial.categories.find(
+      (c: { type: string }) => c.type === "expense",
+    ).id;
+    expect(
+      (
+        await save("accounts", {
+          name: "Test Bank A",
+          type: "Bank",
+          bankName: "Example Bank",
+          accountNumber: "001234",
+          branch: "Dhaka",
+          openingBalance: 100,
+          active: true,
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await save("accounts", {
+          name: "Test Bank B",
+          type: "Bank",
+          openingBalance: 0,
+          active: true,
+        })
+      ).ok(),
+    ).toBeTruthy();
+    const accounts = (await read()).accounts;
+    const a = accounts.find((a: { name: string }) => a.name === "Test Bank A"),
+      b = accounts.find((a: { name: string }) => a.name === "Test Bank B");
+    const expense = {
+      title: "Bank expense",
+      type: "expense",
+      amount: 1,
+      date: "2026-09-26",
+      account: b.id,
+      categoryId,
+    };
+    expect((await save("transactions", expense)).status()).toBe(400);
+    const transfer = {
+      fromAccountId: a.id,
+      toAccountId: b.id,
+      amount: 60,
+      date: "2026-09-26",
+      note: "Bank funding",
+    };
+    expect(
+      (await save("transfers", { ...transfer, amount: 101 })).status(),
+    ).toBe(400);
+    expect(
+      (await save("transfers", { ...transfer, toAccountId: a.id })).status(),
+    ).toBe(400);
+    expect((await save("transfers", transfer)).ok()).toBeTruthy();
+    let data = await read();
+    const t = data.transfers.find(
+      (t: { note: string }) => t.note === "Bank funding",
+    );
+    expect(
+      data.accounts.find((x: { id: string }) => x.id === a.id).balance,
+    ).toBe(40);
+    expect(
+      data.accounts.find((x: { id: string }) => x.id === b.id).balance,
+    ).toBe(60);
+    expect(data.transactions.length).toBe(initial.transactions.length);
+    expect(
+      (await save("transfers", { ...transfer, amount: 50 }, t.id)).ok(),
+    ).toBeTruthy();
+    const attempts = await Promise.all([
+      save("transactions", { ...expense, amount: 40, title: "Concurrent A" }),
+      save("transactions", { ...expense, amount: 40, title: "Concurrent B" }),
+    ]);
+    expect(attempts.filter((r) => r.ok())).toHaveLength(1);
+    data = await read();
+    expect(
+      data.accounts.find((x: { id: string }) => x.id === b.id).balance,
+    ).toBe(10);
+    expect((await remove("transfers", t.id)).status()).toBe(400);
+    expect(
+      (await save("transfers", { ...transfer, amount: 20 }, t.id)).status(),
+    ).toBe(400);
+    const spent = data.transactions.find(
+      (x: { account: string }) => x.account === b.id,
+    );
+    expect(
+      (
+        await save("transactions", { ...expense, amount: 70 }, spent.id)
+      ).status(),
+    ).toBe(400);
+    expect(
+      (
+        await save(
+          "accounts",
+          { name: a.name, type: "Bank", openingBalance: 0, active: true },
+          a.id,
+        )
+      ).status(),
+    ).toBe(400);
+    expect((await remove("accounts", a.id)).status()).toBe(400);
+    expect((await remove("transactions", spent.id)).ok()).toBeTruthy();
+    expect((await remove("transfers", t.id)).ok()).toBeTruthy();
+    expect(
+      (
+        await save(
+          "accounts",
+          {
+            name: "Renamed Bank B",
+            type: "Bank",
+            openingBalance: 0,
+            active: false,
+          },
+          b.id,
+        )
+      ).ok(),
+    ).toBeTruthy();
+    expect((await save("transfers", transfer)).status()).toBe(400);
+    expect((await remove("accounts", b.id)).ok()).toBeTruthy();
+    expect((await remove("accounts", "Cash")).status()).toBe(400);
+    // Both directions between Cash and Bank retain total funds.
+    expect(
+      (
+        await save("transfers", {
+          ...transfer,
+          fromAccountId: "Cash",
+          toAccountId: a.id,
+          amount: 10,
+          note: "Cash deposit",
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await save("transfers", {
+          ...transfer,
+          fromAccountId: a.id,
+          toAccountId: "Cash",
+          amount: 10,
+          note: "Cash withdrawal",
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (await read()).accounts.find((x: { id: string }) => x.id === a.id)
+        .balance,
+    ).toBe(100);
+  } finally {
+    await owner.dispose();
+  }
+});
+
+test("account forms and cash transfer work in the browser", async ({
+  page,
+}) => {
+  await page.goto("/demo");
+  await page
+    .getByRole("button", { name: "Cash & Bank accounts", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add new", exact: true }).click();
+  await page.getByLabel("Account name", { exact: true }).fill("Browser Bank");
+  await page
+    .getByLabel("Bank / provider name", { exact: true })
+    .fill("Example Bank");
+  await page.getByLabel("Account number", { exact: true }).fill("00012345");
+  await page.getByLabel("Opening balance", { exact: true }).fill("500");
+  await page.getByRole("button", { name: "Save account", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Browser Bank", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Transfers", exact: true }).click();
+  await page.getByRole("button", { name: "Add new", exact: true }).click();
+  await page.getByLabel("From account", { exact: true }).selectOption("Cash");
+  await page
+    .getByLabel("To account", { exact: true })
+    .selectOption({ label: "Browser Bank" });
+  await page.getByLabel("Amount", { exact: true }).fill("900000");
+  await page
+    .getByRole("button", { name: "Save transfer", exact: true })
+    .click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "Insufficient balance",
+  );
+  await page.getByLabel("Amount", { exact: true }).fill("50");
+  await page
+    .getByRole("button", { name: "Save transfer", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("row").filter({ hasText: "Browser Bank" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Cash & Bank accounts", exact: true })
+    .click();
+  await expect(
+    page.locator(".account-card").filter({ hasText: "Browser Bank" }),
+  ).toContainText("550");
+  await page.screenshot({
+    path: "test-results/accounts-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});
+
+test("income and expense permissions are enforced independently on the server", async ({
+  playwright,
+}) => {
+  const owner = await playwright.request.newContext({
+    baseURL: origin,
+    extraHTTPHeaders: { Origin: origin },
+  });
+  const clerk = await playwright.request.newContext({
+    baseURL: origin,
+    extraHTTPHeaders: { Origin: origin },
+  });
+  try {
+    await owner.post("/api/auth", {
+      data: { action: "login", ...credentials },
+    });
+    const save = (collection: string, values: object, id?: string) =>
+      owner.post("/api/data", {
+        data: { collection, action: "save", values, id },
+      });
+    const initial = await (await owner.get("/api/data")).json();
+    const incomeCategory = initial.categories.find(
+      (c: { type: string }) => c.type === "income",
+    ).id;
+    const expenseCategory = initial.categories.find(
+      (c: { type: string }) => c.type === "expense",
+    ).id;
+    const perms = ["read", "create", "update", "delete"].map(
+      (a) => "income." + a,
+    );
+    expect(
+      (await save("roles", { name: "Income clerk", permissions: perms })).ok(),
+    ).toBeTruthy();
+    const role = (await (await owner.get("/api/data")).json()).roles.find(
+      (r: { name: string }) => r.name === "Income clerk",
+    );
+    expect(
+      (
+        await save("users", {
+          name: "Clerk",
+          email: "clerk@test.invalid",
+          password: "Clerk-password-123",
+          roleId: role.id,
+        })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await clerk.post("/api/auth", {
+          data: {
+            action: "login",
+            email: "clerk@test.invalid",
+            password: "Clerk-password-123",
+          },
+        })
+      ).ok(),
+    ).toBeTruthy();
+    const income = {
+      title: "Clerk income",
+      type: "income",
+      amount: 10,
+      date: "2026-09-27",
+      account: "Cash",
+      categoryId: incomeCategory,
+    };
+    const expense = {
+      ...income,
+      title: "Clerk expense",
+      type: "expense",
+      categoryId: expenseCategory,
+    };
+    const write = (values: object, id?: string) =>
+      clerk.post("/api/data", {
+        data: { collection: "transactions", action: "save", values, id },
+      });
+    expect((await write(income)).ok()).toBeTruthy();
+    expect((await write(expense)).status()).toBe(403);
+    let data = await (await clerk.get("/api/data")).json();
+    expect(
+      data.transactions.every((t: { type: string }) => t.type === "income"),
+    ).toBeTruthy();
+    const created = data.transactions.find(
+      (t: { title: string }) => t.title === income.title,
+    );
+    expect((await write(expense, created.id)).status()).toBe(403);
+    const oldExpense = initial.transactions.find(
+      (t: { type: string }) => t.type === "expense",
+    );
+    expect(
+      (
+        await clerk.post("/api/data", {
+          data: {
+            collection: "transactions",
+            action: "delete",
+            id: oldExpense.id,
+          },
+        })
+      ).status(),
+    ).toBe(403);
+    expect((await write(income, oldExpense.id)).status()).toBe(403);
+    await save(
+      "roles",
+      {
+        name: role.name,
+        permissions: ["read", "create", "update", "delete"].map(
+          (a) => "expense." + a,
+        ),
+      },
+      role.id,
+    );
+    data = await (await clerk.get("/api/data")).json();
+    expect(
+      data.transactions.every((t: { type: string }) => t.type === "expense"),
+    ).toBeTruthy();
+    expect((await write(income)).status()).toBe(403);
+    expect((await write(expense)).ok()).toBeTruthy();
+    expect(
+      (
+        await clerk.post("/api/data", {
+          data: {
+            collection: "transactions",
+            action: "delete",
+            id: created.id,
+          },
+        })
+      ).status(),
+    ).toBe(403);
+  } finally {
+    await owner.dispose();
+    await clerk.dispose();
+  }
+});
+
+test("all permission controls, bulk selection and restricted navigation", async ({
+  page,
+}) => {
+  await page.goto("/demo");
+  await page
+    .getByRole("button", { name: "Roles & permissions", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add new", exact: true }).click();
+  await expect(page.getByRole("checkbox")).toHaveCount(40);
+  await page.getByRole("button", { name: "Select all", exact: true }).click();
+  await expect(page.locator('input[name="permissions"]:checked')).toHaveCount(
+    40,
+  );
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect(page.locator('input[name="permissions"]:checked')).toHaveCount(
+    0,
+  );
+  for (const name of ["Income: View", "Income: Create"])
+    await page.getByRole("checkbox", { name, exact: true }).check();
+  await page.getByLabel("Role name", { exact: true }).fill("Income only");
+  await page.getByRole("button", { name: "Save role", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem("gazi-family-demo-v1")!);
+    const r = d.roles.find((r: { name: string }) => r.name === "Income only");
+    d.users.find((u: { id: string }) => u.id === d.currentUserId).roleId = r.id;
+    localStorage.setItem("gazi-family-demo-v1", JSON.stringify(d));
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Income", exact: true }),
+  ).toBeVisible();
+  for (const name of ["Overview", "Expenses", "Reports", "Roles & permissions"])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await page
+    .getByRole("button", { name: "Add transaction", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Expense", exact: true }),
+  ).toBeDisabled();
 });

@@ -26,6 +26,14 @@ export const reportTitles: Record<ReportMode, string> = {
 };
 export const statementNote =
   "Income on the left and expenses on the right, grouped by head. Surplus or deficit is income minus expenses for the selected period.";
+export function reportMonthLabel(month: string) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return month;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(month + "-01T00:00:00Z"));
+}
 export function inReportPeriod(
   date: string,
   period: string,
@@ -78,7 +86,9 @@ export function reportTable(rows: ReportRow[], mode: ReportMode) {
     const title =
       mode === "transactions-head"
         ? `${entries[0].category} (${entries[0].type})`
-        : key;
+        : mode === "statement-month"
+          ? reportMonthLabel(key)
+          : key;
     lines.push({ kind: "group", cells: [title] });
     if (statement) {
       const incomeHeads = new Map<string, { name: string; cents: number }>();

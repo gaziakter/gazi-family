@@ -1,4 +1,4 @@
-# Gazi Family
+# Happy Family
 
 A personal family account manager built with Next.js App Router, React, PostgreSQL and Prisma. The responsive dashboard includes income and expense records, categories, monthly budgets, savings goals, family members, editable roles, monthly reports, category breakdowns, PDF export and print reports. Navigation and dashboard labels can switch between English and Bengali; amounts use BDT.
 
@@ -55,7 +55,7 @@ Browser/integration tests require `npx playwright install chromium`, a productio
 ## Permissions and data
 
 - Owner is protected against removal and role changes. Owners create members with initial passwords and assign Member, Viewer or custom roles.
-- All signed-in members can view the family's shared ledger, budgets, goals, member names/emails and role definitions. Role permissions govern server-side writes and access to the report UI/export.
+- Separate View, Create, Update and Delete permissions control each module. Reports have separate View and Export PDF access.
 - Passwords use salted scrypt; opaque session tokens are hashed in PostgreSQL. Sessions expire after seven days. Mutation requests check same-origin headers. Login attempts are limited per email per server process; use a shared rate limiter if deploying multiple server instances.
 - Click your avatar in the top bar to change your password. Changing it revokes all previous sessions, then signs the current browser back in. Owners can reset another member's password through the member editor.
 - Monetary columns use PostgreSQL decimal values. Transactions accept positive values with at most two decimal places; income/expense determines the sign. Balances derive from transactions; accounts are Cash, Bank, bKash and Nagad.
@@ -72,4 +72,14 @@ Back up PostgreSQL regularly with `pg_dump` and restore with `pg_restore`; PDF e
 
 Implementation references: [Next.js App Router](https://nextjs.org/docs/app) and [Prisma 6 PostgreSQL schema](https://www.prisma.io/docs/v6/orm/prisma-schema/overview/data-sources).
 
-Roles use separate View, Create, Update and Delete permissions for transactions, categories, budgets, savings goals, family members and roles. Reports use View and Export PDF. API requests enforce each action; read access filters returned data. Forms and reports may receive category names and member names as lookup data, while member emails and full role permissions require their respective View access. The current user always receives their own profile and role. Existing roles retain their previous access through the CRUD migration. Delegated administrators cannot grant or assign permissions they do not hold.
+Roles use separate View, Create, Update and Delete permissions for income, expenses, categories, budgets, savings goals, family members and roles. Reports use View, Export PDF and Print. Overview has its own View permission. API requests enforce each action; read access filters returned data. Forms and reports may receive category names and member names as lookup data, while member emails and full role permissions require their respective View access. The current user always receives their own profile and role. Existing roles retain their previous access through the CRUD migration. Delegated administrators cannot grant or assign permissions they do not hold.
+
+## Accounts and transfers
+
+Cash & Bank accounts manages account names, bank/provider details, account numbers, branches, opening balances and active status. Existing Cash, Bank, bKash and Nagad entries retain their original account identifiers and amounts during migration. Opening balances default to zero; set genuine starting funds through account management when needed.
+
+Account balances include all saved income, expenses and transfers plus opening funds. Income can be entered at zero balance. An expense or outgoing transfer cannot make its source account negative. Edits and deletions also validate the resulting balances, including reversals of already-spent income or transfers. Existing negative balances are preserved for reconciliation, but cannot be reduced further. Financial mutations run in serializable database transactions with a shared account write to prevent concurrent overspending; conflicting requests return an error and may be retried.
+
+Transfers move funds between any two different active accounts and are recorded separately from income/expense reports. Account deactivation requires zero balance, and accounts with linked entries cannot be deleted. The default Cash account remains active and cannot be deleted. Accounts and transfers have independent CRUD permissions; the migration enables management for Owner and read access for existing ledger readers.
+
+The role editor covers 40 permissions across Overview, Income, Expenses, Categories, Budgets, Savings goals, Cash & Bank accounts, Transfers, Family members, Roles, and Reports. Select all / Clear all affects only permissions the editor is allowed to grant. Income and expense actions are checked independently on the server; changing a transaction type also requires Delete on the original type and Create on the destination type. Reports View authorizes the full income/expense ledger for reporting; without it, only transaction types with View access are returned. Overview displays the modules the user can view. Existing transaction permissions are migrated to equivalent income and expense permissions.

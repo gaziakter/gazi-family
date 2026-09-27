@@ -24,6 +24,7 @@ model User {
   role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
   sessions Session[]
   transactions Transaction[]
+  transfers Transfer[]
   createdAt DateTime @default(now())
 }
 model Session {
@@ -48,6 +49,7 @@ model Transaction {
   amount Decimal @db.Decimal(14, 2)
   date DateTime @db.Date
   account String
+  ledgerAccount Account @relation(fields: [account], references: [id], onDelete: Restrict)
   note String @default("")
   categoryId String
   category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -70,4 +72,33 @@ model Goal {
   target Decimal @db.Decimal(14, 2)
   saved Decimal @db.Decimal(14, 2)
   date DateTime @db.Date
+}
+
+model Account {
+  id String @id @default(cuid())
+  name String @unique
+  type String
+  bankName String @default("")
+  accountNumber String @default("")
+  branch String @default("")
+  openingBalance Decimal @default(0) @db.Decimal(14, 2)
+  active Boolean @default(true)
+  revision Int @default(0)
+  transactions Transaction[]
+  outgoing Transfer[] @relation("TransferSource")
+  incoming Transfer[] @relation("TransferDestination")
+}
+model Transfer {
+  id String @id @default(cuid())
+  fromAccountId String
+  toAccountId String
+  source Account @relation("TransferSource", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  destination Account @relation("TransferDestination", fields: [toAccountId], references: [id], onDelete: Restrict)
+  amount Decimal @db.Decimal(14, 2)
+  date DateTime @db.Date
+  note String @default("")
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([date])
 }

@@ -1,7 +1,13 @@
 "use client";
+import {
+  accountBalances,
+  assertSufficientBalances,
+  defaultAccounts,
+} from "@/lib/accounts";
+import Image from "next/image";
 import PermissionMatrix from "./permission-matrix";
 import PasswordInput from "./password-input";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -43,10 +49,19 @@ import {
 import ReportTable from "./report-table";
 import { reportTable, inReportPeriod, type ReportMode } from "@/lib/reports";
 import PasswordDialog from "./password-dialog";
+import ProfileMenu from "./profile-menu";
 import { categoryColor } from "@/lib/theme";
 import { demoData } from "@/lib/demo";
-import { Data, Collection, permissions, totals } from "@/lib/types";
+import {
+  Data,
+  Collection,
+  permissions,
+  expandPermissions,
+  totals,
+} from "@/lib/types";
 type Page =
+  | "accounts"
+  | "transfers"
   | "overview"
   | "income"
   | "expenses"
@@ -69,6 +84,18 @@ const nav: { id: Page; label: string; bn: string; icon: LucideIcon }[] = [
   { id: "budgets", label: "Budgets", bn: "বাজেট", icon: Wallet },
   { id: "goals", label: "Savings goals", bn: "সঞ্চয়ের লক্ষ্য", icon: Target },
   { id: "reports", label: "Reports", bn: "রিপোর্ট", icon: ChartNoAxesCombined },
+  {
+    id: "accounts",
+    label: "Cash & Bank accounts",
+    bn: "ক্যাশ ও ব্যাংক অ্যাকাউন্ট",
+    icon: Landmark,
+  },
+  {
+    id: "transfers",
+    label: "Transfers",
+    bn: "টাকা ট্রান্সফার",
+    icon: ArrowRight,
+  },
   { id: "members", label: "Family members", bn: "পরিবারের সদস্য", icon: Users },
   {
     id: "roles",
@@ -78,6 +105,8 @@ const nav: { id: Page; label: string; bn: string; icon: LucideIcon }[] = [
   },
 ];
 const collectionFor: Partial<Record<Page, Collection>> = {
+  accounts: "accounts",
+  transfers: "transfers",
   income: "transactions",
   expenses: "transactions",
   categories: "categories",
@@ -112,7 +141,10 @@ function IconFor({ name }: { name: string }) {
 }
 export default function Dashboard({ demo }: { demo: boolean }) {
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [chartMonths, setChartMonths] = useState(6);
+  const [chartSeries, setChartSeries] = useState({ income: true, expense: true });
   const [reportMode, setReportMode] = useState<ReportMode>("transactions-date");
   const [data, setData] = useState<Data | null>(null),
     [page, setPage] = useState<Page>("overview"),
@@ -142,6 +174,26 @@ export default function Dashboard({ demo }: { demo: boolean }) {
       id: string;
     } | null>(null);
   const t = (en: string, bn: string) => (language ? bn : en);
+  async function signOut() {
+    if (signingOut) return;
+    if (demo) { window.location.assign("/"); return; }
+    setSigningOut(true);
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+      if (!response.ok) throw Error();
+      setData(null);
+      setAuth("login");
+      setMobile(false);
+    } catch {
+      setToast("Could not sign out. Please try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
   async function fetchData() {
     const res = await fetch("/api/data");
     const body = await res.json();
@@ -189,6 +241,53 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                   ],
           }));
         }
+        if (!restored.accounts) {
+          restored.accounts = defaultAccounts();
+          restored.transfers = [];
+          restored.roles = restored.roles.map((r) => ({
+            ...r,
+            permissions:
+              r.name === "Owner"
+                ? [...permissions]
+                : [
+                    ...r.permissions,
+                    ...(r.permissions.includes("transactions.read")
+                      ? ["accounts.read", "transfers.read"]
+                      : []),
+                  ],
+          }));
+        }
+        const restoredBalances = accountBalances(
+          restored.accounts,
+          restored.transactions,
+          restored.transfers ?? [],
+        );
+        restored.accounts = restored.accounts.map((a) => ({
+          ...a,
+          balance: (restoredBalances.get(a.id) ?? 0) / 100,
+        }));
+        restored.roles = restored.roles.map((r) => {
+          const legacy = r.permissions.some((p) =>
+            p.startsWith("transactions."),
+          );
+          return {
+            ...r,
+            permissions:
+              r.name === "Owner"
+                ? [...permissions]
+                : expandPermissions([
+                    ...r.permissions,
+                    ...(legacy
+                      ? [
+                          "overview.read",
+                          ...(r.permissions.includes("reports.export")
+                            ? ["reports.print"]
+                            : []),
+                        ]
+                      : []),
+                  ]),
+          };
+        });
         setData(restored);
       } catch {
         setData(demoData());
@@ -236,26 +335,52 @@ export default function Dashboard({ demo }: { demo: boolean }) {
   }, []);
   const me = data?.users.find((u) => u.id === data.currentUserId),
     myRole = data?.roles.find((r) => r.id === me?.roleId);
-  const can = (c: Collection, action = "create") =>
-    !!myRole?.permissions.includes(`${c}.${action}`);
+  const can = (c: Collection, action = "create", type?: string) =>
+    c === "transactions"
+      ? (type ? [type] : ["income", "expense"]).some((t) =>
+          myRole?.permissions.includes(t + "." + action),
+        )
+      : !!myRole?.permissions.includes(c + "." + action);
   const canEnter = (p: Page) =>
-    p === "overview" ||
-    (p === "reports"
-      ? !!myRole?.permissions.includes("reports.read")
-      : !!collectionFor[p] &&
-        ["read", "create", "update", "delete"].some((a) =>
-          can(collectionFor[p]!, a),
-        ));
+    p === "overview"
+      ? !!myRole?.permissions.includes("overview.read")
+      : p === "reports"
+        ? !!myRole?.permissions.includes("reports.read")
+        : !!collectionFor[p] &&
+          ["read", "create", "update", "delete"].some((a) =>
+            can(
+              collectionFor[p]!,
+              a,
+              p === "income"
+                ? "income"
+                : p === "expenses"
+                  ? "expense"
+                  : undefined,
+            ),
+          );
+  useEffect(() => {
+    if (data && !canEnter(page)) {
+      const first = nav.find((n) => canEnter(n.id));
+      if (first) setPage(first.id);
+    }
+  }, [data, page]);
   const entries = useMemo(
     () =>
       can("transactions", "read")
-        ? (data?.transactions.filter((e) => e.date.startsWith(month)) ?? [])
+        ? (data?.transactions.filter(
+            (e) =>
+              e.date.startsWith(month) && can("transactions", "read", e.type),
+          ) ?? [])
         : [],
     [data, month, myRole],
   );
   const summary = totals(entries),
     allSummary = totals(
-      can("transactions", "read") ? (data?.transactions ?? []) : [],
+      can("transactions", "read")
+        ? (data?.transactions.filter((e) =>
+            can("transactions", "read", e.type),
+          ) ?? [])
+        : [],
     );
   const reportEntries =
     page === "reports"
@@ -280,12 +405,14 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     .sort((a, b) => b.date.localeCompare(a.date));
   const reportRows = filtered.map((e) => ({
     ...e,
+    account: data?.accounts.find((a) => a.id === e.account)?.name ?? e.account,
     category: data?.categories.find((c) => c.id === e.categoryId)?.name ?? "",
     member: data?.users.find((u) => u.id === e.userId)?.name ?? "",
   }));
   const reportModel = reportTable(reportRows, reportMode);
   const invalidRange = !!(from && to && from > to);
   function navigate(p: Page) {
+    if (!canEnter(p)) { setToast("You do not have permission to view this page."); return; }
     setMemberFilter("all");
     setReportPeriod(
       p === "reports" && reportMode !== "statement-month" ? "date" : "month",
@@ -310,6 +437,30 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     );
     setMobile(false);
   }
+  function drillDown(p: Page, selectedMonth = month, categoryId = "all") {
+    if (!canEnter(p)) return;
+    navigate(p);
+    setMonth(selectedMonth);
+    setCategoryFilter(categoryId);
+    if (p === "reports") {
+      setReportMode("statement-month");
+      setReportPeriod("month");
+      setFrom(""); setTo("");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function interactive(p: Page, selectedMonth = month, categoryId = "all") {
+    return canEnter(p) ? {
+      role: "button" as const,
+      tabIndex: 0,
+      onClick: () => drillDown(p, selectedMonth, categoryId),
+      onKeyDown: (event: ReactKeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault(); drillDown(p, selectedMonth, categoryId);
+        }
+      },
+    } : {};
+  }
   async function mutate(
     collection: Collection,
     action: "save" | "delete",
@@ -321,13 +472,42 @@ export default function Dashboard({ demo }: { demo: boolean }) {
       !can(
         collection,
         action === "delete" ? "delete" : id ? "update" : "create",
+        collection === "transactions"
+          ? id
+            ? data?.transactions.find((t) => t.id === id)?.type
+            : String(values?.type)
+          : undefined,
       )
     )
       throw Error("Your role does not allow this action.");
+    if (collection === "transactions" && id && action === "save") {
+      const old = data.transactions.find((t) => t.id === id);
+      if (
+        old &&
+        old.type !== values?.type &&
+        (!can("transactions", "delete", old.type) ||
+          !can("transactions", "create", String(values?.type)))
+      )
+        throw Error(
+          "Changing transaction type requires Delete on the old type and Create on the new type.",
+        );
+    }
     if (demo) {
       const next = structuredClone(data);
       const list = next[collection] as unknown as Record<string, unknown>[];
       if (action === "delete") {
+        if (
+          collection === "accounts" &&
+          (id === "Cash" ||
+            data.transactions.some((t) => t.account === id) ||
+            data.transfers.some(
+              (t) => t.fromAccountId === id || t.toAccountId === id,
+            ) ||
+            data.accounts.find((a) => a.id === id)?.balance !== 0)
+        )
+          throw Error(
+            "This account is protected, has a balance, or is in use.",
+          );
         if (
           collection === "users" &&
           (id === data.currentUserId ||
@@ -354,6 +534,34 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         );
       } else {
         const v = { ...values };
+        if (
+          collection === "transactions" &&
+          !data.accounts.find((a) => a.id === v.account)?.active
+        )
+          throw Error("Choose an active account.");
+        if (collection === "transfers") {
+          if (v.fromAccountId === v.toAccountId)
+            throw Error("Choose two different accounts.");
+          if (
+            !data.accounts.find((a) => a.id === v.fromAccountId)?.active ||
+            !data.accounts.find((a) => a.id === v.toAccountId)?.active
+          )
+            throw Error("Choose active accounts.");
+        }
+        if (collection === "accounts") {
+          if (id === "Cash" && (v.type !== "Cash" || !v.active))
+            throw Error("The default Cash account must remain active Cash.");
+          if (
+            id &&
+            !v.active &&
+            data.accounts.find((a) => a.id === id)?.balance !== 0
+          )
+            throw Error(
+              "Transfer the remaining balance before deactivating this account.",
+            );
+          if (data.accounts.some((a) => a.id !== id && a.name === v.name))
+            throw Error("Account name already exists.");
+        }
         delete v.password;
         if (
           collection === "roles" &&
@@ -397,7 +605,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         const row = {
           ...v,
           id: id ?? crypto.randomUUID(),
-          ...(collection === "transactions"
+          ...(collection === "transactions" || collection === "transfers"
             ? {
                 userId: id
                   ? list.find((i) => i.id === id)?.userId
@@ -407,6 +615,28 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         };
         if (id) list[list.findIndex((i) => i.id === id)] = row;
         else list.push(row);
+      }
+      if (["transactions", "transfers", "accounts"].includes(collection)) {
+        const before = accountBalances(
+          data.accounts,
+          data.transactions,
+          data.transfers,
+        );
+        const after = accountBalances(
+          next.accounts,
+          next.transactions,
+          next.transfers,
+        );
+        if (
+          collection === "accounts" &&
+          next.accounts.some((a) => !a.active && (after.get(a.id) ?? 0) !== 0)
+        )
+          throw Error("Inactive accounts must have zero balance.");
+        assertSufficientBalances(before, after, next.accounts);
+        next.accounts = next.accounts.map((a) => ({
+          ...a,
+          balance: (after.get(a.id) ?? 0) / 100,
+        }));
       }
       setData(next);
     } else {
@@ -452,6 +682,9 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             ? {
                 demoRows: filtered.map((e) => ({
                   ...e,
+                  accountName:
+                    data?.accounts.find((a) => a.id === e.account)?.name ??
+                    e.account,
                   category:
                     data?.categories.find((c) => c.id === e.categoryId)?.name ??
                     "",
@@ -477,7 +710,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             ? month.slice(0, 4)
             : month;
       link.download =
-        "gazi-family-" +
+        "happy-family-" +
         reportMode +
         "-" +
         (reportPeriod === "date" ? "date-range" : period) +
@@ -519,7 +752,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         <div className="brand-icon">
           <House />
         </div>
-        <h2>Gazi Family</h2>
+        <h2>Happy Family</h2>
         <LoaderCircle className="spin" />
       </div>
     );
@@ -531,10 +764,11 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             <span className="brand-icon">
               <House size={23} />
             </span>
-            Gazi Family<span className="brand-dot">.</span>
+            <span>
+              Happy Family<span className="brand-dot">.</span>
+            </span>
           </div>
           <div>
-            <span className="eyebrow">A LITTLE MORE TOGETHER</span>
             <h1>
               A happy home.
               <br />A healthier financial future.
@@ -544,18 +778,27 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               and shared dreams in one thoughtful place.
             </p>
           </div>
-          <small>Made for your family. Built for everyday life.</small>
+          <div className="auth-powered-by">
+            <span>Powered By</span>
+            <Image
+              src="/branding/techbela-white.png"
+              alt="Techbela Solutions Ltd."
+              width={3086}
+              height={887}
+              unoptimized
+            />
+          </div>
         </div>
         <form className="auth-form" onSubmit={signIn}>
-          <span className="mini-label">YOUR FAMILY, CONNECTED</span>
-          <h1>
-            {auth === "setup" ? "Welcome to Gazi Family" : "Welcome home"}
-          </h1>
-          <p>
-            {auth === "setup"
-              ? "Create the owner account to get started."
-              : "Sign in to your family’s financial space."}
-          </p>
+          <div className="auth-heading">
+            <span className="mini-label">YOUR FAMILY, CONNECTED</span>
+            <h1>
+              {auth === "setup"
+                ? "Welcome to Happy Family"
+                : "Welcome home"}
+            </h1>
+          </div>
+          {auth === "setup" && <p>Create the owner account to get started.</p>}
           {auth === "setup" && (
             <label>
               Your name
@@ -584,7 +827,6 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               }
             />
           </label>
-          <small>Use at least 10 characters.</small>
           {error && <div className="error">{error}</div>}
           <button className="btn primary" disabled={busy}>
             {busy ? (
@@ -615,15 +857,19 @@ export default function Dashboard({ demo }: { demo: boolean }) {
     }))
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total);
-  const trend = Array.from({ length: 6 }, (_, i) => {
+  const trend = Array.from({ length: chartMonths }, (_, i) => {
     const d = new Date(month + "-01T00:00:00");
-    d.setMonth(d.getMonth() - 5 + i);
+    d.setMonth(d.getMonth() - chartMonths + 1 + i);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     return {
+      key,
       label: d.toLocaleDateString("en-US", { month: "short" }),
       ...totals(
         can("transactions", "read")
-          ? data.transactions.filter((e) => e.date.startsWith(key))
+          ? data.transactions.filter(
+              (e) =>
+                e.date.startsWith(key) && can("transactions", "read", e.type),
+            )
           : [],
       ),
     };
@@ -633,10 +879,15 @@ export default function Dashboard({ demo }: { demo: boolean }) {
   const openAdd = () =>
     setModal({
       collection: collectionFor[page] ?? "transactions",
-      type: page === "income" ? "income" : "expense",
+      type:
+        page === "income" ||
+        (page === "overview" && !can("transactions", "create", "expense"))
+          ? "income"
+          : "expense",
     });
   const actions = (collection: Collection, item: object) =>
-    can(collection, "update") || can(collection, "delete") ? (
+    can(collection, "update", (item as { type?: string }).type) ||
+    can(collection, "delete", (item as { type?: string }).type) ? (
       <div className="row-actions">
         {can(collection, "update") && (
           <button
@@ -704,7 +955,10 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                 </span>
               </td>
               <td className="muted nowrap">{dateLabel(e.date)}</td>
-              <td className="muted">{e.account}</td>
+              <td className="muted">
+                {data.accounts.find((a) => a.id === e.account)?.name ??
+                  e.account}
+              </td>
               <td
                 className={
                   "amount align-right " +
@@ -749,6 +1003,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             <div
               className={full ? "card budget-item large" : "budget-item"}
               key={b.id}
+              {...(!full ? interactive("expenses", month, b.categoryId) : {})}
             >
               <div className="budget-top">
                 <span className="budget-name">
@@ -774,7 +1029,10 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                 <div
                   style={{
                     width: Math.min(pct, 100) + "%",
-                    background: pct > 100 ? "#b70704" : categoryColor(c?.color),
+                    background:
+                      pct > 100
+                        ? "var(--primary-gradient)"
+                        : `linear-gradient(135deg, ${categoryColor(c?.color)}, ${categoryColor(c?.color)}bb)`,
                   }}
                 />
               </div>
@@ -818,13 +1076,13 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             <House size={22} />
           </span>
           <span>
-            Gazi Family<span className="brand-dot">.</span>
+            Happy Family<span className="brand-dot">.</span>
           </span>
         </a>
         <span className="nav-label">{t("WORKSPACE", "ওয়ার্কস্পেস")}</span>
         <nav>
           {nav
-            .slice(0, 7)
+            .slice(0, 9)
             .filter((n) => canEnter(n.id))
             .map((n) => (
               <button
@@ -843,7 +1101,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
         </span>
         <nav>
           {nav
-            .slice(7)
+            .slice(9)
             .filter((n) => canEnter(n.id))
             .map((n) => (
               <button
@@ -857,61 +1115,15 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="together-card">
-            <span className="little-leaf">
-              <Leaf size={21} />
-            </span>
-            <h4>
-              {t("Small steps. Shared dreams.", "ছোট পদক্ষেপ। একসাথে স্বপ্ন।")}
-            </h4>
-            <p>
-              {t(
-                "A little planning today, a brighter tomorrow together.",
-                "আজকের একটু পরিকল্পনা, আগামী দিনের সুন্দর পরিবার।",
-              )}
-            </p>
-            <button onClick={() => navigate("goals")}>
-              {t("Explore savings goals", "সঞ্চয়ের লক্ষ্য দেখুন")}
-              <ArrowRight size={14} />
-            </button>
-          </div>
-          <div className="profile">
-            <span className="profile-avatar">
-              {me?.name
-                .split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")}
-            </span>
-            <div>
-              <strong>{me?.name}</strong>
-              <small>
-                {myRole?.name ?? "Member"}
-                {demo ? " · Demo" : ""}
-              </small>
-            </div>
-            {!demo && (
-              <button
-                title="Sign out"
-                onClick={async () => {
-                  try {
-                    const r = await fetch("/api/auth", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "logout" }),
-                    });
-                    if (!r.ok) throw Error();
-                    setData(null);
-                    setAuth("login");
-                  } catch {
-                    setToast("Could not sign out. Please try again.");
-                  }
-                }}
-              >
-                <LogOut size={17} />
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            className="btn primary sidebar-signout"
+            disabled={signingOut}
+            onClick={signOut}
+          >
+            <LogOut size={18} />
+            {signingOut ? "Signing out..." : "Signout"}
+          </button>
         </div>
       </aside>
       <div className="main-shell">
@@ -943,32 +1155,18 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               {language ? "English" : "বাংলা"}
             </button>
             <span className="topbar-divider" />
-            <button
-              className="top-avatar"
-              title="Change password"
-              onClick={() =>
-                demo
-                  ? setToast(
-                      "Password management is available in the connected workspace.",
-                    )
-                  : setPasswordOpen(true)
-              }
-            >
-              {me?.name[0]}
-            </button>
+            <ProfileMenu
+              name={me?.name ?? "Member"}
+              email={me?.email ?? ""}
+              demo={demo}
+              onPassword={() => setPasswordOpen(true)}
+              onSignout={signOut}
+            />
           </div>
         </header>
         <main className="main-content">
           <div className="page-heading">
             <div>
-              <div className="eyebrow">
-                {page === "overview"
-                  ? t("YOUR FAMILY, AT A GLANCE", "এক নজরে আপনার পরিবার")
-                  : t(
-                      "EVERY LITTLE DETAIL MATTERS",
-                      "প্রতিটি হিসাব গুরুত্বপূর্ণ",
-                    )}
-              </div>
               <h1>
                 {page === "overview"
                   ? t(
@@ -978,26 +1176,19 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                   : language
                     ? currentNav.bn
                     : currentNav.label}
-                {page === "overview" && (
+                {!canEnter(page) && (
+                  <div className="empty">
+                    No access to this page. Ask the Owner to update your role
+                    permissions.
+                  </div>
+                )}
+                {page === "overview" && canEnter("overview") && (
                   <span className="heading-spark">✳</span>
                 )}
               </h1>
-              <p>
-                {page === "overview"
-                  ? t(
-                      "Welcome back, " +
-                        (me?.name.split(" ")[0] ?? "Gazi") +
-                        ". Let’s make room for what matters.",
-                      "স্বাগতম! পরিবারের প্রতিটি আয়-ব্যয় থাকুক আপনার হাতের মুঠোয়।",
-                    )
-                  : t(
-                      "Keep your family’s finances organized, together.",
-                      "পরিবারের আর্থিক হিসাব গুছিয়ে রাখুন একসাথে।",
-                    )}
-              </p>
             </div>
             <div className="heading-actions">
-              {page !== "reports" && (
+              {page !== "reports" && page !== "accounts" && (
                 <label className="month-picker">
                   <CalendarDays size={16} />
                   <span>{monthName}</span>
@@ -1014,7 +1205,16 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               )}
               {(page === "overview"
                 ? can("transactions")
-                : collectionFor[page] && can(collectionFor[page]!)) && (
+                : collectionFor[page] &&
+                  can(
+                    collectionFor[page]!,
+                    "create",
+                    page === "income"
+                      ? "income"
+                      : page === "expenses"
+                        ? "expense"
+                        : undefined,
+                  )) && (
                 <button className="btn primary" onClick={openAdd}>
                   <Plus size={17} />
                   {page === "overview" ||
@@ -1048,14 +1248,20 @@ export default function Dashboard({ demo }: { demo: boolean }) {
           {page === "overview" && (
             <>
               <section className="stat-grid">
-                <div className="stat-card balance-card">
+                <div className="stat-card balance-card" {...interactive("accounts")}>
                   <div className="stat-top">
                     <span>{t("Total balance", "মোট ব্যালেন্স")}</span>
                     <span className="stat-icon">
                       <Wallet size={19} />
                     </span>
                   </div>
-                  <h2>{money(allSummary.balance)}</h2>
+                  <h2>
+                    {money(
+                      data.accounts.length
+                        ? data.accounts.reduce((sum, a) => sum + a.balance, 0)
+                        : allSummary.balance,
+                    )}
+                  </h2>
                   <div className="stat-foot">
                     <span className="balance-pill">
                       <span /> {t("All accounts", "সকল অ্যাকাউন্ট")}
@@ -1064,7 +1270,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                   </div>
                   <div className="balance-decoration" />
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" {...interactive("income")}>
                   <div className="stat-top">
                     <span>{t("Total income", "মোট আয়")}</span>
                     <span className="stat-icon pale-green">
@@ -1081,7 +1287,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                     <span>{t("This month", "এই মাসে")}</span>
                   </div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" {...interactive("expenses")}>
                   <div className="stat-top">
                     <span>{t("Total expenses", "মোট ব্যয়")}</span>
                     <span className="stat-icon pale-orange">
@@ -1098,7 +1304,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                     <span>{t("This month", "এই মাসে")}</span>
                   </div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" {...interactive("reports")}>
                   <div className="stat-top">
                     <span>{t("Net savings", "নিট সঞ্চয়")}</span>
                     <span className="stat-icon pale-blue">
@@ -1129,20 +1335,18 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         )}
                       </p>
                     </div>
-                    <span className="period-chip">
-                      {t("Last 6 months", "গত ৬ মাস")}
-                      <ChevronDown size={13} />
-                    </span>
+                    <select className="period-chip" aria-label="Chart period" value={chartMonths}
+                      onChange={(event) => setChartMonths(Number(event.target.value))}>
+                      {[3, 6, 12].map((count) => <option key={count} value={count}>{t("Last " + count + " months", "গত " + count + " মাস")}</option>)}
+                    </select>
                   </div>
                   <div className="chart-legend">
-                    <span>
-                      <i className="legend-square income" />
-                      Income
-                    </span>
-                    <span>
-                      <i className="legend-square expense" />
-                      Expenses
-                    </span>
+                    <button type="button" aria-pressed={chartSeries.income} onClick={() => setChartSeries(v => ({...v, income: !v.income}))}>
+                      <i className="legend-square income" /> Income
+                    </button>
+                    <button type="button" aria-pressed={chartSeries.expense} onClick={() => setChartSeries(v => ({...v, expense: !v.expense}))}>
+                      <i className="legend-square expense" /> Expenses
+                    </button>
                   </div>
                   <div className="bar-chart">
                     <div className="chart-y">
@@ -1162,13 +1366,16 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         {trend.map((v, i) => (
                           <div
                             className={
-                              "bar-group " + (i === 5 ? "selected" : "")
+                              "bar-group " + (i === trend.length - 1 ? "selected" : "")
                             }
-                            key={v.label}
+                            key={v.key}
                           >
                             <div className="bar-pair">
                               <div
                                 className="bar income"
+                                {...interactive("income", v.key)}
+                                aria-label={v.key + " income: " + money(v.income)}
+                                hidden={!chartSeries.income}
                                 style={{
                                   height: (v.income / chartMax) * 100 + "%",
                                 }}
@@ -1176,6 +1383,9 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                               />
                               <div
                                 className="bar expense"
+                                {...interactive("expenses", v.key)}
+                                aria-label={v.key + " expense: " + money(v.expense)}
+                                hidden={!chartSeries.expense}
                                 style={{
                                   height: (v.expense / chartMax) * 100 + "%",
                                 }}
@@ -1218,7 +1428,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                   <div className="donut-wrap">
                     <svg
                       viewBox="0 0 180 180"
-                      role="img"
+                      role="group"
                       aria-label="Expense breakdown"
                     >
                       <circle
@@ -1240,6 +1450,8 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         return (
                           <circle
                             key={c.id}
+                            {...interactive("expenses", month, c.id)}
+                            aria-label={c.name + ": " + money(c.total)}
                             cx="90"
                             cy="90"
                             r="69"
@@ -1260,8 +1472,8 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                     </div>
                   </div>
                   <div className="spending-legend">
-                    {expenseGroups.slice(0, 4).map((c) => (
-                      <div key={c.id}>
+                    {expenseGroups.map((c) => (
+                      <div key={c.id} {...interactive("expenses", month, c.id)} title={money(c.total)}>
                         <span>
                           <i
                             className="dot"
@@ -1274,27 +1486,6 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         </strong>
                       </div>
                     ))}
-                    {expenseGroups.length > 4 && (
-                      <div>
-                        <span>
-                          <i
-                            className="dot"
-                            style={{ background: "#d68b83" }}
-                          />
-                          Other categories
-                        </span>
-                        <strong>
-                          {Math.round(
-                            (expenseGroups
-                              .slice(4)
-                              .reduce((s, c) => s + c.total, 0) /
-                              summary.expense) *
-                              100,
-                          )}
-                          %
-                        </strong>
-                      </div>
-                    )}
                     {!expenseGroups.length && (
                       <p className="muted">
                         Your spending breakdown will appear here.
@@ -1550,8 +1741,10 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         onChange={(e) => setAccount(e.target.value)}
                       >
                         <option value="all">All accounts</option>
-                        {["Cash", "Bank", "bKash", "Nagad"].map((a) => (
-                          <option key={a}>{a}</option>
+                        {data.accounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
                         ))}
                       </select>
                       <select
@@ -1608,7 +1801,7 @@ export default function Dashboard({ demo }: { demo: boolean }) {
                         <button
                           className="text-button"
                           disabled={
-                            !myRole?.permissions.includes("reports.export")
+                            !myRole?.permissions.includes("reports.print")
                           }
                           onClick={() => window.print()}
                         >
@@ -1808,13 +2001,100 @@ export default function Dashboard({ demo }: { demo: boolean }) {
               </div>
             </div>
           )}
+          {page === "accounts" && canEnter("accounts") && (
+            <>
+              <div className="info-strip">
+                Account balance = opening balance + income - expenses + incoming
+                transfers - outgoing transfers.
+              </div>
+              <div className="role-grid">
+                {data.accounts.map((a) => (
+                  <div className="card account-card" key={a.id}>
+                    <div className="goal-top">
+                      <span className="goal-icon">
+                        <Landmark />
+                      </span>
+                      {actions("accounts", a)}
+                    </div>
+                    <h3>{a.name}</h3>
+                    <p className="muted">
+                      {a.type} · {a.active ? "Active" : "Inactive"}
+                    </p>
+                    <h2 className={a.balance < 0 ? "negative" : ""}>
+                      {money(a.balance)}
+                    </h2>
+                    {a.bankName && <p>{a.bankName}</p>}
+                    {a.accountNumber && (
+                      <p className="muted">Account: {a.accountNumber}</p>
+                    )}
+                    {a.branch && <p className="muted">Branch: {a.branch}</p>}
+                    <small>Opening balance: {money(a.openingBalance)}</small>
+                    {a.balance < 0 && (
+                      <p className="error">
+                        Existing deficit. Add income or transfer funds before
+                        spending.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {!data.accounts.length && (
+                <div className="empty">No accounts to display.</div>
+              )}
+            </>
+          )}
+          {page === "transfers" && canEnter("transfers") && (
+            <div className="card">
+              <div className="info-strip">
+                Move money between Cash, Bank and Mobile accounts. Transfers do
+                not count as income or expenses.
+              </div>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Note</th>
+                      <th className="align-right">Amount</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.transfers
+                      .filter((t) => t.date.startsWith(month))
+                      .map((t) => (
+                        <tr key={t.id}>
+                          <td>{dateLabel(t.date)}</td>
+                          <td>
+                            {data.accounts.find((a) => a.id === t.fromAccountId)
+                              ?.name ?? t.fromAccountId}
+                          </td>
+                          <td>
+                            {data.accounts.find((a) => a.id === t.toAccountId)
+                              ?.name ?? t.toAccountId}
+                          </td>
+                          <td>{t.note || "-"}</td>
+                          <td className="align-right">{money(t.amount)}</td>
+                          <td>{actions("transfers", t)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {!data.transfers.some((t) => t.date.startsWith(month)) && (
+                <div className="empty">No transfers this month.</div>
+              )}
+            </div>
+          )}
           {page === "roles" && canEnter("roles") && (
             <>
               <div className="info-strip">
                 <ShieldCheck size={19} />
                 Choose View, Create, Update and Delete separately for each
-                module. Reports have separate View and Export PDF permissions.
-                The Owner role is protected.
+                module. Reports have separate View, Export PDF and Print
+                permissions. The Owner role is protected.
               </div>
               <div className="role-grid">
                 {data.roles.map((r) => (
@@ -1837,22 +2117,21 @@ export default function Dashboard({ demo }: { demo: boolean }) {
             </>
           )}
           <footer className="page-footer">
-            <span>
-              <span className="footer-brand">Gazi Family</span> ·{" "}
-              {t("A little more together.", "একটু বেশি একসাথে।")}
-            </span>
-            <span>
-              <ShieldCheck size={13} />
-              {demo
-                ? t(
-                    "Demo data · saved in this browser",
-                    "ডেমো তথ্য · এই ব্রাউজারে সংরক্ষিত",
-                  )
-                : t(
-                    "Your private family workspace",
-                    "আপনার ব্যক্তিগত পারিবারিক হিসাব",
-                  )}
-            </span>
+            <span>Powered By</span>
+            <a
+              href="https://techbela.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Techbela Solutions Ltd. website (opens in a new tab)"
+            >
+              <Image
+                src="/branding/techbela.png"
+                alt="Techbela Solutions Ltd."
+                width={1482}
+                height={427}
+                unoptimized
+              />
+            </a>
           </footer>
         </main>
       </div>
@@ -1952,6 +2231,20 @@ function RecordModal({
     ),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const myPermissions =
+    data.roles.find(
+      (r) =>
+        r.id === data.users.find((u) => u.id === data.currentUserId)?.roleId,
+    )?.permissions ?? [];
+  const canChooseType = (target: string) =>
+    collection !== "transactions" ||
+    (item
+      ? target === item.type
+        ? myPermissions.includes(target + ".update")
+        : myPermissions.includes(String(item.type) + ".update") &&
+          myPermissions.includes(String(item.type) + ".delete") &&
+          myPermissions.includes(target + ".create")
+      : myPermissions.includes(target + ".create"));
   const val = (key: string, fallback: string | number = "") =>
     String(item?.[key] ?? fallback);
   const titles: Record<Collection, string> = {
@@ -1961,6 +2254,8 @@ function RecordModal({
     goals: "savings goal",
     users: "family member",
     roles: "role",
+    accounts: "account",
+    transfers: "transfer",
   };
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1968,8 +2263,9 @@ function RecordModal({
     setError("");
     const form = new FormData(e.currentTarget);
     const values: Record<string, unknown> = Object.fromEntries(form);
-    for (const k of ["amount", "target", "saved"])
+    for (const k of ["amount", "target", "saved", "openingBalance"])
       if (k in values) values[k] = Number(values[k]);
+    if (collection === "accounts") values.active = form.get("active") === "on";
     if (collection === "roles") values.permissions = form.getAll("permissions");
     if (collection === "users" && !values.password) delete values.password;
     try {
@@ -2012,7 +2308,7 @@ function RecordModal({
       >
         <div className="modal-heading">
           <div>
-            <span className="eyebrow">GAZI FAMILY</span>
+            <span className="eyebrow">HAPPY FAMILY ACCOUNT</span>
             <h2 id="modal-title">
               {item ? "Edit" : "Add"} {titles[collection]}
             </h2>
@@ -2026,6 +2322,7 @@ function RecordModal({
             <button
               type="button"
               className={type === "income" ? "selected" : ""}
+              disabled={!canChooseType("income")}
               onClick={() => setType("income")}
             >
               <ArrowDownLeft size={16} />
@@ -2034,6 +2331,7 @@ function RecordModal({
             <button
               type="button"
               className={type === "expense" ? "selected" : ""}
+              disabled={!canChooseType("expense")}
               onClick={() => setType("expense")}
             >
               <ArrowUpRight size={16} />
@@ -2111,9 +2409,13 @@ function RecordModal({
                     name="account"
                     defaultValue={val("account", "Cash")}
                   >
-                    {["Cash", "Bank", "bKash", "Nagad"].map((a) => (
-                      <option key={a}>{a}</option>
-                    ))}
+                    {data.accounts
+                      .filter((a) => a.active || a.id === item?.account)
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} - {money(a.balance)}
+                        </option>
+                      ))}
                   </select>
                 </label>
               </div>
@@ -2124,6 +2426,143 @@ function RecordModal({
                   defaultValue={val("note")}
                   maxLength={1000}
                   placeholder="A little detail for later…"
+                />
+              </label>
+            </>
+          )}
+          {collection === "accounts" && (
+            <>
+              <label>
+                Account name
+                <input
+                  name="name"
+                  required
+                  maxLength={120}
+                  defaultValue={val("name")}
+                  placeholder="e.g. My bank account"
+                />
+              </label>
+              <label>
+                Account type
+                <select name="type" defaultValue={val("type", "Bank")}>
+                  <option>Bank</option>
+                  <option>Cash</option>
+                  <option>Mobile</option>
+                </select>
+              </label>
+              <label>
+                Bank / provider name
+                <input
+                  name="bankName"
+                  maxLength={120}
+                  defaultValue={val("bankName")}
+                />
+              </label>
+              <label>
+                Account number
+                <input
+                  name="accountNumber"
+                  maxLength={80}
+                  defaultValue={val("accountNumber")}
+                />
+              </label>
+              <label>
+                Branch
+                <input
+                  name="branch"
+                  maxLength={120}
+                  defaultValue={val("branch")}
+                />
+              </label>
+              <label>
+                Opening balance
+                <input
+                  name="openingBalance"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  max="999999999999.99"
+                  required
+                  defaultValue={val("openingBalance", 0)}
+                />
+              </label>
+              <small className="muted">
+                Starting funds only. Use income or transfers for later deposits.
+              </small>
+              <label className="account-active">
+                <input
+                  name="active"
+                  type="checkbox"
+                  defaultChecked={item?.active !== false}
+                />
+                Active account
+              </label>
+            </>
+          )}
+          {collection === "transfers" && (
+            <>
+              <label>
+                From account
+                <select
+                  aria-label="From account"
+                  name="fromAccountId"
+                  required
+                  defaultValue={val("fromAccountId", "Cash")}
+                >
+                  {data.accounts
+                    .filter((a) => a.active)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} - {money(a.balance)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                To account
+                <select
+                  aria-label="To account"
+                  name="toAccountId"
+                  required
+                  defaultValue={val("toAccountId", "")}
+                >
+                  <option value="">Choose destination</option>
+                  {data.accounts
+                    .filter((a) => a.active)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Amount
+                <input
+                  type="number"
+                  name="amount"
+                  min="0.01"
+                  step="0.01"
+                  max="999999999999.99"
+                  defaultValue={val("amount")}
+                  required
+                />
+              </label>
+              <label>
+                Date
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={val("date", today())}
+                  required
+                />
+              </label>
+              <label>
+                Note
+                <textarea
+                  name="note"
+                  maxLength={1000}
+                  defaultValue={val("note")}
                 />
               </label>
             </>

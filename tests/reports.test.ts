@@ -80,7 +80,7 @@ test("monthly statements show independent period totals, surplus and deficit", (
   const table = reportTable(rows, "statement-month");
   assert.deepEqual(
     table.lines.filter((l) => l.kind === "group").map((l) => l.cells[0]),
-    ["2026-08", "2026-09"],
+    ["August 2026", "September 2026"],
   );
   assert.equal(table.income, 6000);
   assert.equal(table.expense, 3300);

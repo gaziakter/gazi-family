@@ -1,3 +1,4 @@
+import { defaultAccounts } from "@/lib/accounts";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
@@ -77,6 +78,10 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       user = await db.$transaction(async (tx) => {
+        await tx.account.createMany({
+          data: defaultAccounts().map(({ balance, ...a }) => a),
+          skipDuplicates: true,
+        });
         await tx.family.create({ data: { id: "gazi-family" } });
         const role = await tx.role.create({
           data: { name: "Owner", permissions: [...permissions] },

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { currentUser, sameOrigin } from "@/lib/auth";
 import { createReportPdf } from "@/lib/report-pdf";
-import { inReportPeriod } from "@/lib/reports";
+import { inReportPeriod, reportMonthLabel } from "@/lib/reports";
 export const runtime = "nodejs";
 const string = z.string().max(120);
 const schema = z.object({
@@ -33,6 +33,7 @@ const schema = z.object({
         amount: z.number().finite().positive().max(999999999999.99),
         category: string,
         account: string,
+        accountName: string.optional(),
         member: string,
         categoryId: string,
         userId: string,
@@ -74,7 +75,11 @@ export async function POST(req: Request) {
         );
       // Read actual records on the server; never accept client-supplied real balances.
       const entries = await db.transaction.findMany({
-        include: { category: true, user: { select: { name: true } } },
+        include: {
+          category: true,
+          user: { select: { name: true } },
+          ledgerAccount: { select: { name: true } },
+        },
         orderBy: { date: "desc" },
       });
       rows = entries.map((e) => ({
@@ -85,6 +90,7 @@ export async function POST(req: Request) {
         amount: Number(e.amount),
         category: e.category.name,
         account: e.account,
+        accountName: e.ledgerAccount.name,
         member: e.user.name,
         categoryId: e.categoryId,
         userId: e.userId,
@@ -117,9 +123,11 @@ export async function POST(req: Request) {
           ? "All time"
           : input.period === "year"
             ? input.month.slice(0, 4)
-            : input.month;
+            : reportMonthLabel(input.month);
     const filters = [
-      input.account !== "all" ? `Account: ${input.account}` : "All accounts",
+      input.account !== "all"
+        ? `Account: ${rows.find((r) => r.account === input.account)?.accountName ?? input.account}`
+        : "All accounts",
       input.categoryId !== "all"
         ? `Category: ${rows.find((r) => r.categoryId === input.categoryId)?.category ?? "Selected category"}`
         : "All categories",
@@ -131,7 +139,7 @@ export async function POST(req: Request) {
       input.search ? `Search: ${input.search}` : "",
     ].filter(Boolean);
     const pdf = await createReportPdf(
-      filtered,
+      filtered.map((r) => ({ ...r, account: r.accountName ?? r.account })),
       period,
       filters,
       input.demo,
@@ -140,7 +148,7 @@ export async function POST(req: Request) {
     return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="gazi-family-${input.mode}-${period.toLowerCase().replaceAll(" ", "-")}.pdf"`,
+        "Content-Disposition": `attachment; filename="happy-family-${input.mode}-${period.toLowerCase().replaceAll(" ", "-")}.pdf"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       },

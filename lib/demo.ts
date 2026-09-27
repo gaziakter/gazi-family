@@ -1,3 +1,4 @@
+import { defaultAccounts, accountBalances } from "./accounts";
 import {
   Data,
   permissions,
@@ -10,6 +11,8 @@ export function demoData(): Data {
     .slice(0, 7);
   const data: Data = {
     currentUserId: "u1",
+    accounts: defaultAccounts(),
+    transfers: [],
     roles: [
       { id: "r1", name: "Owner", permissions: [...permissions] },
       {
@@ -178,5 +181,28 @@ export function demoData(): Data {
       },
     );
   }
+  for (const a of data.accounts.filter((a) => a.id !== "Bank")) {
+    const spent = data.transactions
+      .filter((t) => t.account === a.id && t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+    data.transfers.push({
+      id: "demo-funding-" + a.id,
+      fromAccountId: "Bank",
+      toAccountId: a.id,
+      amount: spent + 5000,
+      date: month + "-01",
+      note: "Sample account funding",
+      userId: "u1",
+    });
+  }
+  const balances = accountBalances(
+    data.accounts,
+    data.transactions,
+    data.transfers,
+  );
+  data.accounts = data.accounts.map((a) => ({
+    ...a,
+    balance: (balances.get(a.id) ?? 0) / 100,
+  }));
   return data;
 }

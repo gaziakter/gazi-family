@@ -1,0 +1,32 @@
+import { test, expect } from "@playwright/test";
+
+test("dashboard drilldowns preserve month and category and charts respond to controls", async ({ page }) => {
+  await page.goto("/demo");
+  const month = await page.getByLabel("Select month").inputValue();
+  await page.getByLabel("Chart period").selectOption("12");
+  await expect(page.locator(".bar-group")).toHaveCount(12);
+  await page.locator(".chart-legend").getByRole("button", { name: "Income", exact: true }).click();
+  await expect(page.locator(".bar.income:visible")).toHaveCount(0);
+  await page.locator(".chart-legend").getByRole("button", { name: "Income", exact: true }).click();
+  await page.locator(".bar.income").first().focus();
+  const barLabel = await page.locator(".bar.income").first().getAttribute("aria-label");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Income", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Select month")).toHaveValue(barLabel!.slice(0, 7));
+  await page.getByLabel("Select month").fill(month);
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  const category = (await page.locator(".spending-legend [role=button] span").first().innerText()).trim();
+  await page.locator(".spending-legend [role=button]").first().click();
+  await expect(page.getByRole("heading", { name: "Expenses", exact: true })).toBeVisible();
+  const categories = await page.locator("tbody .category-tag").allTextContents();
+  expect(categories.length).toBeGreaterThan(0);
+  expect(categories.every(value => value.trim() === category)).toBe(true);
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page.locator(".stat-card").filter({ hasText: "Net savings" }).click();
+  await expect(page.getByLabel("Report type")).toHaveValue("statement-month");
+  await expect(page.getByLabel("Report month")).toHaveValue(month);
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".stat-card").filter({ hasText: "Total balance" }).click();
+  await expect(page.getByRole("heading", { name: "Cash & Bank accounts", exact: true })).toBeVisible();
+});

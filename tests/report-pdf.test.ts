@@ -33,6 +33,9 @@ test("paginates long notes and many transactions without dropping content", asyn
   const pages = (buffer.toString("latin1").match(/\/Type \/Page\b/g) ?? [])
     .length;
   assert.ok(pages >= 4, `Expected multiple pages, got ${pages}`);
+  const sizes = [...buffer.toString("latin1").matchAll(/\/MediaBox\s*\[([^\]]+)\]/g)];
+  assert.equal(sizes.length, pages);
+  for (const size of sizes) assert.deepEqual(size[1].trim().split(/\s+/).map(Number), [0, 0, 595.28, 841.89]);
 });
 test("exports an empty report", async () => {
   const buffer = await createReportPdf([], "2026-09", []);
@@ -50,5 +53,6 @@ test("exports each grouped report mode", async () => {
   ] as ReportMode[]) {
     const buffer = await createReportPdf([row], "2026-09", [], false, mode);
     assert.equal(buffer.subarray(0, 5).toString(), "%PDF-");
+    assert.match(buffer.toString("latin1"), /\/MediaBox\s*\[0 0 595\.28 841\.89\]/);
   }
 });

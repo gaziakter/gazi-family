@@ -3,7 +3,6 @@ import path from "node:path";
 
 import {
   reportTable,
-  statementNote,
   type ReportRow,
   type ReportMode,
 } from "./reports";
@@ -18,11 +17,11 @@ export async function createReportPdf(
   const table = reportTable(rows, mode);
   const doc = new PDFDocument({
     size: "A4",
-    layout: "landscape",
+    layout: "portrait",
     margin: 36,
     bufferPages: true,
     font: path.join(process.cwd(), "public/fonts/NotoSansBengali.ttf"),
-    info: { Title: "Gazi Family — Financial report", Author: "Gazi Family" },
+    info: { Title: "Happy Family — Financial report", Author: "Happy Family" },
   });
   const chunks: Buffer[] = [];
   const finished = new Promise<Buffer>((resolve, reject) => {
@@ -33,32 +32,34 @@ export async function createReportPdf(
   const pageWidth = doc.page.width,
     left = 36,
     width = pageWidth - 72;
-  const red = "#b70704",
+  const red = "#cf192b",
     ink = "#343430",
     gray = "#74746e";
-  doc.fillColor(red).fontSize(23).text("Gazi Family", left, 30);
-  doc.fillColor(ink).fontSize(16).text(table.title, left, 66);
+  const headingOptions = { width, align: "center" as const };
+  doc.fillColor(red).fontSize(23).text("Happy Family", left, 30, headingOptions);
+  doc.fillColor(ink).fontSize(16).text(
+    mode === "statement-month" ? "Income & Expense Statement" : table.title,
+    left,
+    66,
+    headingOptions,
+  );
   doc
     .fontSize(10)
     .fillColor(gray)
-    .text(`Period: ${period}`, left, 93, { width });
+    .text(`Period: ${period}`, left, 93, headingOptions);
   doc.text(
     `Generated: ${new Date().toLocaleString("en-GB", { timeZone: "Asia/Dhaka" })} (Asia/Dhaka)`,
     left,
     doc.y + 3,
-    { width },
+    headingOptions,
   );
   if (demo)
     doc
       .fillColor(red)
-      .text("DEMO REPORT — sample data", left, doc.y + 4, { width });
-  if (filters.length)
-    doc.fillColor(gray).text(filters.join("  |  "), left, doc.y + 6, { width });
-  if (table.statement)
-    doc
-      .fontSize(9)
-      .fillColor(gray)
-      .text(statementNote, left, doc.y + 6, { width });
+      .text("DEMO REPORT — sample data", left, doc.y + 4, headingOptions);
+  const dateRange = filters.filter((filter) => /^(From|To):/.test(filter));
+  if (dateRange.length)
+    doc.fillColor(gray).text(dateRange.join("  |  "), left, doc.y + 6, headingOptions);
   let y = doc.y + 18;
   const income =
     rows
@@ -94,44 +95,51 @@ export async function createReportPdf(
       .fontSize(9)
       .fillColor(gray)
       .text(String(label), x + 12, y + 8, { lineBreak: false });
+    const valueText = amount(Number(value));
+    let valueSize = 17;
+    doc.fontSize(valueSize);
+    while (doc.widthOfString(valueText) > width / 3 - 32 && valueSize > 8) {
+      doc.fontSize(--valueSize);
+    }
     doc
-      .fontSize(17)
       .fillColor(ink)
-      .text(amount(Number(value)), x + 12, y + 24, { lineBreak: false });
+      .text(valueText, x + 12, y + 24, { lineBreak: false });
   });
   y += 72;
   const widths = table.statement
-    ? [width / 2 - 125, 125, width / 2 - 125, 125]
-    : [70, 185, 100, 62, 125, 114, width - 656];
+    ? [width / 2 - 110, 110, width / 2 - 110, 110]
+    : [55, 120, 65, 50, 75, 79, width - 444];
   const columns = table.columns.map((label, i) => ({
-    label,
+    label: table.statement ? ["Income", "Amount (BDT)", "Expense", "Amount (BDT)"][i] : label,
     width: widths[i],
   }));
   const bottom = doc.page.height - 52,
     lineHeight = 13;
   function header() {
-    if (table.statement) {
-      doc.rect(left, y, width, 25).fill(red);
-      doc.fontSize(12).fillColor("#fffaf0");
-      doc.text("Income", left + 7, y + 5, { lineBreak: false });
-      doc.text("Expense", left + width / 2 + 7, y + 5, { lineBreak: false });
-      y += 25;
-    }
-    doc.rect(left, y, width, 25).fill(red);
+    doc.fontSize(table.statement ? 9 : 8);
+    const labels = columns.map((col) => wrap(col.label, col.width - 14));
+    const headerHeight = Math.max(25, Math.max(...labels.map((lines) => lines.length)) * 13 + 14);
+    doc.rect(left, y, width, headerHeight).fill(
+      doc
+        .linearGradient(left, y, left + width, y + 25)
+        .stop(0, "#ed1c2e")
+        .stop(0.5, "#d7192d")
+        .stop(1, "#a91629"),
+    );
     let x = left;
-    doc.fontSize(9).fillColor("#fffaf0");
-    for (const col of columns) {
-      doc.text(col.label, x + 7, y + 7, { lineBreak: false });
+    doc.fillColor("#fffaf0");
+    for (const [i, col] of columns.entries()) {
+      labels[i].forEach((label, j) => doc.text(label, x + 7, y + 7 + j * 13, { lineBreak: false }));
       x += col.width;
     }
-    y += 25;
+    y += headerHeight;
   }
   function nextPage() {
-    doc.addPage();
+    doc.addPage({ size: "A4", layout: "portrait", margin: 36 });
     doc
       .fontSize(12)
       .fillColor(red)
-      .text("Gazi Family · Financial report", left, 26, { lineBreak: false });
+      .text("Happy Family · Financial report", left, 26, headingOptions);
     y = 53;
     header();
   }
@@ -174,6 +182,7 @@ export async function createReportPdf(
       });
   }
   table.lines.forEach((row, index) => {
+    if (table.statement && row.kind === "group") return;
     doc.fontSize(9);
     const layoutColumns =
       row.kind === "group" || row.kind === "balance" ? [{ width }] : columns;
